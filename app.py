@@ -1,85 +1,66 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from rectpack import newPacker
+from otimizador import otimizar_corte
+from layout import desenhar_chapa
+from historico import salvar_producao, carregar_historico
 
-st.set_page_config(page_title="Otimizador de Corte de Vidro", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("📐 Otimizador de Corte de Vidro")
+st.title("Sistema de Otimização de Corte de Vidro")
 
-arquivo = st.file_uploader("Envie a planilha Excel", type=["xlsx"])
+menu = st.sidebar.selectbox(
+"Menu",
+[
+"Otimização",
+"Histórico produção"
+]
+)
 
-largura_chapa = st.number_input("Largura da chapa (mm)", value=2200)
-altura_chapa = st.number_input("Altura da chapa (mm)", value=3210)
+if menu == "Otimização":
 
-def expandir_pecas(df):
-    return df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
+    arquivo = st.file_uploader("Enviar pedido Excel", type=["xlsx"])
 
-def otimizar(df, largura_chapa, altura_chapa):
+    largura_chapa = st.number_input("Largura chapa", value=2200)
+    altura_chapa = st.number_input("Altura chapa", value=3210)
 
-    packer = newPacker(rotation=True)
+    if arquivo:
 
-    for _, r in df.iterrows():
-        packer.add_rect(r["largura"], r["altura"])
+        df = pd.read_excel(arquivo)
 
-    packer.add_bin(largura_chapa, altura_chapa, float("inf"))
+        df = df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
 
-    packer.pack()
+        packer = otimizar_corte(df, largura_chapa, altura_chapa)
 
-    return packer
+        chapas = len(packer)
 
-def desenhar_layout(packer, largura_chapa, altura_chapa):
+        area_chapa = largura_chapa * altura_chapa
+        area_total = (df["largura"] * df["altura"]).sum()
 
-    fig, ax = plt.subplots()
+        sucata = chapas * area_chapa - area_total
+        sucata_percent = sucata / (chapas * area_chapa) * 100
 
-    for abin in packer:
+        col1, col2 = st.columns(2)
 
-        for rect in abin:
+        col1.metric("Chapas necessárias", chapas)
+        col2.metric("Sucata %", round(sucata_percent,2))
 
-            x = rect.x
-            y = rect.y
-            w = rect.width
-            h = rect.height
+        if st.button("Mostrar layout"):
 
-            rect_patch = plt.Rectangle((x,y), w, h, fill=False)
+            fig = desenhar_chapa(packer, largura_chapa, altura_chapa)
 
-            ax.add_patch(rect_patch)
+            st.pyplot(fig)
 
-    ax.set_xlim(0, largura_chapa)
-    ax.set_ylim(0, altura_chapa)
+        if st.button("Salvar produção"):
 
-    ax.set_aspect('equal')
+            salvar_producao(
+                {
+                    "chapas": chapas,
+                    "sucata_percent": sucata_percent
+                }
+            )
 
-    return fig
+if menu == "Histórico produção":
 
-if arquivo:
+    hist = carregar_historico()
 
-    df = pd.read_excel(arquivo)
-
-    st.subheader("Planilha carregada")
-    st.dataframe(df)
-
-    df = expandir_pecas(df)
-
-    packer = otimizar(df, largura_chapa, altura_chapa)
-
-    chapas = len(packer)
-
-    area_chapa = largura_chapa * altura_chapa
-    area_total = (df["largura"] * df["altura"]).sum()
-
-    sucata = chapas * area_chapa - area_total
-    sucata_percent = sucata / (chapas * area_chapa) * 100
-
-    st.subheader("Resultado")
-
-    col1, col2 = st.columns(2)
-
-    col1.metric("Chapas necessárias", chapas)
-    col2.metric("Sucata %", round(sucata_percent,2))
-
-    if st.button("Mostrar layout"):
-
-        fig = desenhar_layout(packer, largura_chapa, altura_chapa)
-
-        st.pyplot(fig)
+    st.dataframe(hist)
