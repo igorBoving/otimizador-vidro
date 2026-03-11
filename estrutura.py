@@ -34,4 +34,6 @@ def explodir_portas(pedido):
 
             })
 
-    return pd.DataFrame(vidros)
+    df = pd.DataFrame(vidros)
+
+    return df
