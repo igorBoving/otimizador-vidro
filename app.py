@@ -1,115 +1,155 @@
 import streamlit as st
 import pandas as pd
-from cadastro import carregar_modelos, salvar_modelo
-from otimizador import otimizar_corte
-from layout import desenhar_chapa
-from historico import salvar_hist, carregar_hist
+import matplotlib.pyplot as plt
+from rectpack import newPacker
 
-st.set_page_config(layout="wide")
+st.title("Otimizador de Corte de Vidro")
 
-st.title("Sistema de Corte de Vidro")
+# ----------------------------
+# carregar estrutura
+# ----------------------------
 
-menu = st.sidebar.selectbox(
-"Menu",
-[
-"Cadastrar modelos",
-"Otimização",
-"Histórico"
-]
-)
+estrutura = pd.read_csv("estrutura_produto.csv")
 
-if menu == "Cadastrar modelos":
+# ----------------------------
+# pedido operador
+# ----------------------------
 
-    st.header("Cadastro de portas")
+st.header("Pedido de portas")
 
-    codigo = st.text_input("Código da porta")
+porta = st.number_input("Código da porta", step=1)
 
-    largura = st.number_input("Largura")
-    altura = st.number_input("Altura")
+quantidade = st.number_input("Quantidade", step=1)
 
-    if st.button("Salvar modelo"):
+if st.button("Calcular"):
 
-        salvar_modelo(codigo, largura, altura)
+    pedido = pd.DataFrame([{
+        "porta":porta,
+        "quantidade":quantidade
+    }])
 
-        st.success("Modelo salvo")
+# ----------------------------
+# explodir portas em vidros
+# ----------------------------
 
-    st.subheader("Modelos cadastrados")
+    vidros = []
 
-    df = carregar_modelos()
+    for _, p in pedido.iterrows():
 
-    st.dataframe(df)
+        porta = p["porta"]
+        qtd_portas = p["quantidade"]
 
-# -----------------------
+        componentes = estrutura[estrutura["porta"] == porta]
 
-if menu == "Otimização":
+        for _, c in componentes.iterrows():
 
-    df_modelos = carregar_modelos()
+            qtd_vidro = qtd_portas * c["quantidade"]
 
-    st.subheader("Selecionar portas")
+            vidros.append({
 
-    pedido = []
+                "codigo": c["vidro_codigo"],
+                "tipo": c["tipo_vidro"],
+                "largura": c["largura"],
+                "altura": c["altura"],
+                "quantidade": qtd_vidro
 
-    for _, r in df_modelos.iterrows():
-
-        qtd = st.number_input(
-            f"{r['codigo']} ({r['largura']}x{r['altura']})",
-            min_value=0,
-            step=1
-        )
-
-        if qtd > 0:
-
-            pedido.append({
-                "codigo": r["codigo"],
-                "largura": r["largura"],
-                "altura": r["altura"],
-                "quantidade": qtd
             })
 
-    largura_chapa = st.number_input("Largura chapa", value=2200)
-    altura_chapa = st.number_input("Altura chapa", value=3210)
+    df_vidros = pd.DataFrame(vidros)
 
-    if st.button("Calcular corte"):
+# ----------------------------
+# separar vidros
+# ----------------------------
 
-        df = pd.DataFrame(pedido)
+    insulado = df_vidros[df_vidros["tipo"]=="insulado"]
+    tek = df_vidros[df_vidros["tipo"]=="tek"]
 
-        df = df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
+# ----------------------------
+# função otimização
+# ----------------------------
 
-        packer = otimizar_corte(df, largura_chapa, altura_chapa)
+    def otimizar(df, largura_chapa, altura_chapa):
 
-        chapas = len(packer)
+        packer = newPacker(rotation=True)
 
-        area_chapa = largura_chapa * altura_chapa
-        area_total = (df["largura"] * df["altura"]).sum()
+        for _, r in df.iterrows():
 
-        sucata = chapas * area_chapa - area_total
-        sucata_percent = sucata / (chapas * area_chapa) * 100
+            for i in range(int(r["quantidade"])):
 
-        st.metric("Chapas necessárias", chapas)
-        st.metric("Sucata %", round(sucata_percent,2))
+                packer.add_rect(
+                    r["largura"],
+                    r["altura"],
+                    rid=r["codigo"]
+                )
 
-        indice = st.number_input(
-            "Escolher chapa",
-            0,
-            chapas-1,
-            0
+        packer.add_bin(largura_chapa, altura_chapa, float("inf"))
+
+        packer.pack()
+
+        return packer
+
+# ----------------------------
+# otimizar insulado
+# ----------------------------
+
+    packer_insulado = otimizar(insulado,6000,3210)
+
+# ----------------------------
+# otimizar tek
+# ----------------------------
+
+    packer_tek = otimizar(tek,3300,2134)
+
+# ----------------------------
+# resultados
+# ----------------------------
+
+    st.header("Resultado")
+
+    st.subheader("Vidro INSULADO")
+
+    st.write("Chapas necessárias:",len(packer_insulado))
+
+    st.subheader("Vidro TEK")
+
+    st.write("Chapas necessárias:",len(packer_tek))
+
+# ----------------------------
+# layout
+# ----------------------------
+
+    indice = st.number_input(
+        "Mostrar chapa insulado",
+        0,
+        len(packer_insulado)-1,
+        0
+    )
+
+    fig, ax = plt.subplots()
+
+    abin = packer_insulado[indice]
+
+    for rect in abin:
+
+        x=rect.x
+        y=rect.y
+        w=rect.width
+        h=rect.height
+
+        r=plt.Rectangle((x,y),w,h,fill=False)
+
+        ax.add_patch(r)
+
+        ax.text(
+            x+w/2,
+            y+h/2,
+            rect.rid,
+            ha="center"
         )
 
-        fig = desenhar_chapa(packer, largura_chapa, altura_chapa, indice)
+    ax.set_xlim(0,6000)
+    ax.set_ylim(0,3210)
 
-        st.pyplot(fig)
+    ax.set_aspect('equal')
 
-        salvar_hist({
-            "chapas": chapas,
-            "sucata": sucata_percent
-        })
-
-# -----------------------
-
-if menu == "Histórico":
-
-    st.header("Histórico de produção")
-
-    hist = carregar_hist()
-
-    st.dataframe(hist)
+    st.pyplot(fig)
