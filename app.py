@@ -1,36 +1,33 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from rectpack import newPacker
+import os
 
-st.title("Otimizador de Corte de Vidro")
+ARQUIVO = "estrutura_produto.csv"
 
-# ----------------------------
-# carregar estrutura
-# ----------------------------
 
-estrutura = pd.read_csv("estrutura_produto.csv")
+def carregar():
 
-# ----------------------------
-# pedido operador
-# ----------------------------
+    if os.path.exists(ARQUIVO):
+        return pd.read_csv(ARQUIVO)
 
-st.header("Pedido de portas")
+    else:
+        df = pd.DataFrame(columns=[
+            "porta",
+            "vidro_codigo",
+            "tipo_vidro",
+            "largura",
+            "altura",
+            "quantidade"
+        ])
+        df.to_csv(ARQUIVO, index=False)
+        return df
 
-porta = st.number_input("Código da porta", step=1)
 
-quantidade = st.number_input("Quantidade", step=1)
+def salvar(df):
+    df.to_csv(ARQUIVO, index=False)
 
-if st.button("Calcular"):
 
-    pedido = pd.DataFrame([{
-        "porta":porta,
-        "quantidade":quantidade
-    }])
-
-# ----------------------------
-# explodir portas em vidros
-# ----------------------------
+def explodir_portas(pedido, estrutura):
 
     vidros = []
 
@@ -39,117 +36,120 @@ if st.button("Calcular"):
         porta = p["porta"]
         qtd_portas = p["quantidade"]
 
-        componentes = estrutura[estrutura["porta"] == porta]
+        comp = estrutura[estrutura["porta"] == porta]
 
-        for _, c in componentes.iterrows():
+        for _, c in comp.iterrows():
 
             qtd_vidro = qtd_portas * c["quantidade"]
 
             vidros.append({
-
                 "codigo": c["vidro_codigo"],
                 "tipo": c["tipo_vidro"],
                 "largura": c["largura"],
                 "altura": c["altura"],
                 "quantidade": qtd_vidro
-
             })
 
-    df_vidros = pd.DataFrame(vidros)
+    return pd.DataFrame(vidros)
 
-# ----------------------------
-# separar vidros
-# ----------------------------
 
-    insulado = df_vidros[df_vidros["tipo"]=="insulado"]
-    tek = df_vidros[df_vidros["tipo"]=="tek"]
+st.title("📐 Otimizador de Corte de Vidro")
 
-# ----------------------------
-# função otimização
-# ----------------------------
+estrutura = carregar()
 
-    def otimizar(df, largura_chapa, altura_chapa):
+aba1, aba2, aba3 = st.tabs(["Produção", "Cadastrar Vidro", "Excluir"])
 
-        packer = newPacker(rotation=True)
+# -------------------
+# PRODUÇÃO
+# -------------------
 
-        for _, r in df.iterrows():
+with aba1:
 
-            for i in range(int(r["quantidade"])):
+    st.header("Pedido de portas")
 
-                packer.add_rect(
-                    r["largura"],
-                    r["altura"],
-                    rid=r["codigo"]
-                )
+    porta = st.number_input("Código da porta", step=1)
 
-        packer.add_bin(largura_chapa, altura_chapa, float("inf"))
+    qtd = st.number_input("Quantidade", step=1)
 
-        packer.pack()
+    if st.button("Calcular vidros"):
 
-        return packer
+        pedido = pd.DataFrame({
+            "porta": [porta],
+            "quantidade": [qtd]
+        })
 
-# ----------------------------
-# otimizar insulado
-# ----------------------------
+        vidros = explodir_portas(pedido, estrutura)
 
-    packer_insulado = otimizar(insulado,6000,3210)
+        st.subheader("Vidros necessários")
 
-# ----------------------------
-# otimizar tek
-# ----------------------------
+        st.dataframe(vidros)
 
-    packer_tek = otimizar(tek,3300,2134)
+        insulado = vidros[vidros["tipo"] == "insulado"]
 
-# ----------------------------
-# resultados
-# ----------------------------
+        tek = vidros[vidros["tipo"] == "tek"]
 
-    st.header("Resultado")
+        st.subheader("Resumo")
 
-    st.subheader("Vidro INSULADO")
+        st.write("Insulado:", len(insulado))
+        st.write("Tek:", len(tek))
 
-    st.write("Chapas necessárias:",len(packer_insulado))
 
-    st.subheader("Vidro TEK")
+# -------------------
+# CADASTRAR
+# -------------------
 
-    st.write("Chapas necessárias:",len(packer_tek))
+with aba2:
 
-# ----------------------------
-# layout
-# ----------------------------
+    st.header("Cadastrar novo vidro")
 
-    indice = st.number_input(
-        "Mostrar chapa insulado",
-        0,
-        len(packer_insulado)-1,
-        0
-    )
+    porta = st.number_input("Código da porta", step=1, key="p")
 
-    fig, ax = plt.subplots()
+    vidro = st.number_input("Código do vidro", step=1)
 
-    abin = packer_insulado[indice]
+    tipo = st.selectbox("Tipo", ["insulado", "tek"])
 
-    for rect in abin:
+    largura = st.number_input("Largura")
 
-        x=rect.x
-        y=rect.y
-        w=rect.width
-        h=rect.height
+    altura = st.number_input("Altura")
 
-        r=plt.Rectangle((x,y),w,h,fill=False)
+    quantidade = st.number_input("Quantidade na porta", step=1)
 
-        ax.add_patch(r)
+    if st.button("Salvar vidro"):
 
-        ax.text(
-            x+w/2,
-            y+h/2,
-            rect.rid,
-            ha="center"
-        )
+        novo = pd.DataFrame({
 
-    ax.set_xlim(0,6000)
-    ax.set_ylim(0,3210)
+            "porta": [porta],
+            "vidro_codigo": [vidro],
+            "tipo_vidro": [tipo],
+            "largura": [largura],
+            "altura": [altura],
+            "quantidade": [quantidade]
 
-    ax.set_aspect('equal')
+        })
 
-    st.pyplot(fig)
+        estrutura = pd.concat([estrutura, novo])
+
+        salvar(estrutura)
+
+        st.success("Vidro cadastrado!")
+
+
+# -------------------
+# EXCLUIR
+# -------------------
+
+with aba3:
+
+    st.header("Excluir item")
+
+    st.dataframe(estrutura)
+
+    codigo = st.number_input("Código do vidro para excluir")
+
+    if st.button("Excluir"):
+
+        estrutura = estrutura[estrutura["vidro_codigo"] != codigo]
+
+        salvar(estrutura)
+
+        st.success("Item removido!")
