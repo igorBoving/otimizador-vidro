@@ -46,7 +46,9 @@ if menu == "Otimização":
 
         if st.button("Mostrar layout"):
 
-            fig = desenhar_chapa(packer, largura_chapa, altura_chapa)
+        indice = st.number_input("Escolher chapa", 0, len(packer)-1, 0)
+
+fig = desenhar_chapa(packer, largura_chapa, altura_chapa, indice)
 
             st.pyplot(fig)
 
