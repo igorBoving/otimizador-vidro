@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import random
+from rectpack import newPacker
 
 st.set_page_config(page_title="Otimizador de Corte de Vidro", layout="wide")
 
@@ -12,34 +12,38 @@ arquivo = st.file_uploader("Envie a planilha Excel", type=["xlsx"])
 largura_chapa = st.number_input("Largura da chapa (mm)", value=2200)
 altura_chapa = st.number_input("Altura da chapa (mm)", value=3210)
 
-tentativas = st.slider("Número de simulações", 100, 10000, 2000)
-
 def expandir_pecas(df):
     return df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
 
-def desenhar_layout(df, largura_chapa, altura_chapa):
+def otimizar(df, largura_chapa, altura_chapa):
+
+    packer = newPacker(rotation=True)
+
+    for _, r in df.iterrows():
+        packer.add_rect(r["largura"], r["altura"])
+
+    packer.add_bin(largura_chapa, altura_chapa, float("inf"))
+
+    packer.pack()
+
+    return packer
+
+def desenhar_layout(packer, largura_chapa, altura_chapa):
 
     fig, ax = plt.subplots()
 
-    x = 0
-    y = 0
-    linha_altura = 0
+    for abin in packer:
 
-    for _, r in df.iterrows():
+        for rect in abin:
 
-        w = r["largura"]
-        h = r["altura"]
+            x = rect.x
+            y = rect.y
+            w = rect.width
+            h = rect.height
 
-        if x + w > largura_chapa:
-            x = 0
-            y += linha_altura
-            linha_altura = 0
+            rect_patch = plt.Rectangle((x,y), w, h, fill=False)
 
-        rect = plt.Rectangle((x,y), w, h, fill=False)
-        ax.add_patch(rect)
-
-        x += w
-        linha_altura = max(linha_altura, h)
+            ax.add_patch(rect_patch)
 
     ax.set_xlim(0, largura_chapa)
     ax.set_ylim(0, altura_chapa)
@@ -47,38 +51,6 @@ def desenhar_layout(df, largura_chapa, altura_chapa):
     ax.set_aspect('equal')
 
     return fig
-
-
-def calcular_layout(df, largura_chapa, altura_chapa):
-
-    x = 0
-    y = 0
-    linha_altura = 0
-    chapas = 1
-
-    for _, r in df.iterrows():
-
-        w = r["largura"]
-        h = r["altura"]
-
-        if x + w > largura_chapa:
-
-            x = 0
-            y += linha_altura
-            linha_altura = 0
-
-        if y + h > altura_chapa:
-
-            chapas += 1
-            x = 0
-            y = 0
-            linha_altura = 0
-
-        x += w
-        linha_altura = max(linha_altura, h)
-
-    return chapas
-
 
 if arquivo:
 
@@ -89,34 +61,25 @@ if arquivo:
 
     df = expandir_pecas(df)
 
-    melhor_chapas = 999999
-    melhor_layout = None
+    packer = otimizar(df, largura_chapa, altura_chapa)
 
-    for i in range(tentativas):
-
-        df_random = df.sample(frac=1)
-
-        chapas = calcular_layout(df_random, largura_chapa, altura_chapa)
-
-        if chapas < melhor_chapas:
-
-            melhor_chapas = chapas
-            melhor_layout = df_random
-
-    st.subheader("Resultado otimizado")
-
-    st.metric("Chapas necessárias", melhor_chapas)
+    chapas = len(packer)
 
     area_chapa = largura_chapa * altura_chapa
     area_total = (df["largura"] * df["altura"]).sum()
 
-    sucata = melhor_chapas * area_chapa - area_total
-    sucata_percent = sucata / (melhor_chapas * area_chapa) * 100
+    sucata = chapas * area_chapa - area_total
+    sucata_percent = sucata / (chapas * area_chapa) * 100
 
-    st.metric("Sucata %", round(sucata_percent,2))
+    st.subheader("Resultado")
 
-    if st.button("Mostrar melhor layout"):
+    col1, col2 = st.columns(2)
 
-        fig = desenhar_layout(melhor_layout, largura_chapa, altura_chapa)
+    col1.metric("Chapas necessárias", chapas)
+    col2.metric("Sucata %", round(sucata_percent,2))
+
+    if st.button("Mostrar layout"):
+
+        fig = desenhar_layout(packer, largura_chapa, altura_chapa)
 
         st.pyplot(fig)
