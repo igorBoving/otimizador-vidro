@@ -1,68 +1,107 @@
 import streamlit as st
 import pandas as pd
-from otimizador import otimizar_corte
-from layout import desenhar_chapa
-from historico import salvar_producao, carregar_historico
+import matplotlib.pyplot as plt
+from rectpack import newPacker
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Otimizador de Corte de Vidro", layout="wide")
 
-st.title("Sistema de Otimização de Corte de Vidro")
+st.title("📐 Otimizador de Corte de Vidro")
 
-menu = st.sidebar.selectbox(
-"Menu",
-[
-"Otimização",
-"Histórico produção"
-]
-)
+arquivo = st.file_uploader("Envie a planilha Excel", type=["xlsx"])
 
-if menu == "Otimização":
+largura_chapa = st.number_input("Largura da chapa (mm)", value=2200)
+altura_chapa = st.number_input("Altura da chapa (mm)", value=3210)
 
-    arquivo = st.file_uploader("Enviar pedido Excel", type=["xlsx"])
 
-    largura_chapa = st.number_input("Largura chapa", value=2200)
-    altura_chapa = st.number_input("Altura chapa", value=3210)
+def expandir_pecas(df):
+    return df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
 
-    if arquivo:
 
-        df = pd.read_excel(arquivo)
+def otimizar(df, largura_chapa, altura_chapa):
 
-        df = df.loc[df.index.repeat(df["quantidade"])].reset_index(drop=True)
+    packer = newPacker(rotation=True)
 
-        packer = otimizar_corte(df, largura_chapa, altura_chapa)
+    for _, r in df.iterrows():
+        packer.add_rect(r["largura"], r["altura"])
 
-        chapas = len(packer)
+    packer.add_bin(largura_chapa, altura_chapa, float("inf"))
 
-        area_chapa = largura_chapa * altura_chapa
-        area_total = (df["largura"] * df["altura"]).sum()
+    packer.pack()
 
-        sucata = chapas * area_chapa - area_total
-        sucata_percent = sucata / (chapas * area_chapa) * 100
+    return packer
 
-        col1, col2 = st.columns(2)
 
-        col1.metric("Chapas necessárias", chapas)
-        col2.metric("Sucata %", round(sucata_percent,2))
+def desenhar_chapa(packer, largura_chapa, altura_chapa, indice_chapa):
 
-        if st.button("Mostrar layout"):
+    fig, ax = plt.subplots()
 
-        indice = st.number_input("Escolher chapa", 0, len(packer)-1, 0)
+    abin = packer[indice_chapa]
 
-fig = desenhar_chapa(packer, largura_chapa, altura_chapa, indice)
+    for rect in abin:
 
-            st.pyplot(fig)
+        x = rect.x
+        y = rect.y
+        w = rect.width
+        h = rect.height
 
-        if st.button("Salvar produção"):
+        r = plt.Rectangle((x, y), w, h, fill=False)
 
-            salvar_producao(
-                {
-                    "chapas": chapas,
-                    "sucata_percent": sucata_percent
-                }
-            )
+        ax.add_patch(r)
 
-if menu == "Histórico produção":
+        ax.text(
+            x + w / 2,
+            y + h / 2,
+            f"{round(w)}x{round(h)}",
+            ha="center",
+            va="center",
+            fontsize=8
+        )
 
-    hist = carregar_historico()
+    ax.set_xlim(0, largura_chapa)
+    ax.set_ylim(0, altura_chapa)
 
-    st.dataframe(hist)
+    ax.set_aspect('equal')
+
+    return fig
+
+
+if arquivo:
+
+    df = pd.read_excel(arquivo)
+
+    st.subheader("Planilha carregada")
+    st.dataframe(df)
+
+    df = expandir_pecas(df)
+
+    packer = otimizar(df, largura_chapa, altura_chapa)
+
+    chapas = len(packer)
+
+    area_chapa = largura_chapa * altura_chapa
+    area_total = (df["largura"] * df["altura"]).sum()
+
+    sucata = chapas * area_chapa - area_total
+    sucata_percent = sucata / (chapas * area_chapa) * 100
+
+    st.subheader("Resultado")
+
+    col1, col2 = st.columns(2)
+
+    col1.metric("Chapas necessárias", chapas)
+    col2.metric("Sucata %", round(sucata_percent, 2))
+
+    st.subheader("Visualização das chapas")
+
+    indice = st.number_input(
+        "Escolher chapa",
+        min_value=0,
+        max_value=chapas - 1,
+        value=0
+    )
+
+    if st.button("Mostrar layout"):
+
+        fig = desenhar_chapa(packer, largura_chapa, altura_chapa, indice)
+
+        st.pyplot(fig)
