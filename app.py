@@ -5,27 +5,36 @@ import os
 ARQUIVO = "estrutura_produto.csv"
 
 
+# ----------------------------
+# BANCO DE DADOS
+# ----------------------------
+
 def carregar():
 
     if os.path.exists(ARQUIVO):
         return pd.read_csv(ARQUIVO)
 
-    else:
-        df = pd.DataFrame(columns=[
-            "porta",
-            "vidro_codigo",
-            "tipo_vidro",
-            "largura",
-            "altura",
-            "quantidade"
-        ])
-        df.to_csv(ARQUIVO, index=False)
-        return df
+    df = pd.DataFrame(columns=[
+        "porta",
+        "vidro_codigo",
+        "tipo_vidro",
+        "largura",
+        "altura",
+        "quantidade"
+    ])
+
+    df.to_csv(ARQUIVO, index=False)
+
+    return df
 
 
 def salvar(df):
     df.to_csv(ARQUIVO, index=False)
 
+
+# ----------------------------
+# EXPLODIR PORTAS → VIDROS
+# ----------------------------
 
 def explodir_portas(pedido, estrutura):
 
@@ -53,19 +62,27 @@ def explodir_portas(pedido, estrutura):
     return pd.DataFrame(vidros)
 
 
+# ----------------------------
+# APP
+# ----------------------------
+
 st.title("📐 Otimizador de Corte de Vidro")
 
 estrutura = carregar()
 
-aba1, aba2, aba3 = st.tabs(["Produção", "Cadastrar Vidro", "Excluir"])
+aba1, aba2, aba3 = st.tabs([
+    "Produção",
+    "Cadastrar Porta",
+    "Gerenciar Itens"
+])
 
-# -------------------
+# ----------------------------
 # PRODUÇÃO
-# -------------------
+# ----------------------------
 
 with aba1:
 
-    st.header("Pedido de portas")
+    st.header("Pedido de produção")
 
     porta = st.number_input("Código da porta", step=1)
 
@@ -84,72 +101,157 @@ with aba1:
 
         st.dataframe(vidros)
 
-        insulado = vidros[vidros["tipo"] == "insulado"]
-
+        normal = vidros[vidros["tipo"] == "normal"]
         tek = vidros[vidros["tipo"] == "tek"]
 
         st.subheader("Resumo")
 
-        st.write("Insulado:", len(insulado))
-        st.write("Tek:", len(tek))
+        st.write("Vidros normais:", normal["quantidade"].sum())
+        st.write("Vidros tek:", tek["quantidade"].sum())
 
 
-# -------------------
-# CADASTRAR
-# -------------------
+# ----------------------------
+# CADASTRAR PORTA
+# ----------------------------
 
 with aba2:
 
-    st.header("Cadastrar novo vidro")
+    st.header("Cadastrar porta")
 
-    porta = st.number_input("Código da porta", step=1, key="p")
+    porta = st.number_input("Código do pacote")
 
-    vidro = st.number_input("Código do vidro", step=1)
+    tipo = st.selectbox(
+        "Tipo de porta",
+        ["Simples", "Duplo", "Triplo"]
+    )
 
-    tipo = st.selectbox("Tipo", ["insulado", "tek"])
+    novos = []
 
-    largura = st.number_input("Largura")
+    if tipo == "Simples":
 
-    altura = st.number_input("Altura")
+        tipo_vidro = st.selectbox("Tipo vidro", ["normal", "tek"])
 
-    quantidade = st.number_input("Quantidade na porta", step=1)
+        largura = st.number_input("largura")
 
-    if st.button("Salvar vidro"):
+        altura = st.number_input("altura")
 
-        novo = pd.DataFrame({
+        if st.button("Salvar porta"):
 
-            "porta": [porta],
-            "vidro_codigo": [vidro],
-            "tipo_vidro": [tipo],
-            "largura": [largura],
-            "altura": [altura],
-            "quantidade": [quantidade]
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+1,
+                "tipo_vidro": tipo_vidro,
+                "largura": largura,
+                "altura": altura,
+                "quantidade": 1
+            })
 
-        })
 
-        estrutura = pd.concat([estrutura, novo])
+    if tipo == "Duplo":
+
+        st.write("Vidro normal")
+
+        largura1 = st.number_input("largura normal")
+        altura1 = st.number_input("altura normal")
+
+        st.write("Vidro tek")
+
+        largura2 = st.number_input("largura tek")
+        altura2 = st.number_input("altura tek")
+
+        if st.button("Salvar porta"):
+
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+1,
+                "tipo_vidro": "normal",
+                "largura": largura1,
+                "altura": altura1,
+                "quantidade": 1
+            })
+
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+2,
+                "tipo_vidro": "tek",
+                "largura": largura2,
+                "altura": altura2,
+                "quantidade": 1
+            })
+
+
+    if tipo == "Triplo":
+
+        st.write("Vidro normal 1")
+
+        largura1 = st.number_input("largura normal 1")
+        altura1 = st.number_input("altura normal 1")
+
+        st.write("Vidro normal 2")
+
+        largura2 = st.number_input("largura normal 2")
+        altura2 = st.number_input("altura normal 2")
+
+        st.write("Vidro tek")
+
+        largura3 = st.number_input("largura tek")
+        altura3 = st.number_input("altura tek")
+
+        if st.button("Salvar porta"):
+
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+1,
+                "tipo_vidro": "normal",
+                "largura": largura1,
+                "altura": altura1,
+                "quantidade": 1
+            })
+
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+2,
+                "tipo_vidro": "normal",
+                "largura": largura2,
+                "altura": altura2,
+                "quantidade": 1
+            })
+
+            novos.append({
+                "porta": porta,
+                "vidro_codigo": porta*10+3,
+                "tipo_vidro": "tek",
+                "largura": largura3,
+                "altura": altura3,
+                "quantidade": 1
+            })
+
+
+    if len(novos) > 0:
+
+        estrutura = pd.concat([estrutura, pd.DataFrame(novos)])
 
         salvar(estrutura)
 
-        st.success("Vidro cadastrado!")
+        st.success("Porta cadastrada!")
 
 
-# -------------------
-# EXCLUIR
-# -------------------
+# ----------------------------
+# GERENCIAR
+# ----------------------------
 
 with aba3:
 
-    st.header("Excluir item")
+    st.header("Itens cadastrados")
 
     st.dataframe(estrutura)
 
-    codigo = st.number_input("Código do vidro para excluir")
+    codigo = st.number_input("Código da porta para excluir")
 
-    if st.button("Excluir"):
+    if st.button("Excluir porta"):
 
-        estrutura = estrutura[estrutura["vidro_codigo"] != codigo]
+        estrutura = estrutura[estrutura["porta"] != codigo]
 
         salvar(estrutura)
 
-        st.success("Item removido!")
+        st.success("Porta removida!")
