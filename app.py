@@ -1,20 +1,23 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+from rectpack import newPacker
 import os
+import random
 
-ARQUIVO = "estrutura_produto.csv"
+ARQUIVO="estrutura_produto.csv"
 
-
-# ----------------------------
+# -----------------------
 # BANCO DE DADOS
-# ----------------------------
+# -----------------------
 
 def carregar():
 
     if os.path.exists(ARQUIVO):
+
         return pd.read_csv(ARQUIVO)
 
-    df = pd.DataFrame(columns=[
+    df=pd.DataFrame(columns=[
         "porta",
         "vidro_codigo",
         "tipo_vidro",
@@ -23,235 +26,137 @@ def carregar():
         "quantidade"
     ])
 
-    df.to_csv(ARQUIVO, index=False)
+    df.to_csv(ARQUIVO,index=False)
 
     return df
 
 
 def salvar(df):
-    df.to_csv(ARQUIVO, index=False)
 
+    df.to_csv(ARQUIVO,index=False)
 
-# ----------------------------
-# EXPLODIR PORTAS → VIDROS
-# ----------------------------
+# -----------------------
+# EXPLODIR PORTAS
+# -----------------------
 
-def explodir_portas(pedido, estrutura):
+def explodir_portas(pedido,estrutura):
 
-    vidros = []
+    vidros=[]
 
-    for _, p in pedido.iterrows():
+    for _,p in pedido.iterrows():
 
-        porta = p["porta"]
-        qtd_portas = p["quantidade"]
+        porta=p["porta"]
+        qtd=p["quantidade"]
 
-        comp = estrutura[estrutura["porta"] == porta]
+        comp=estrutura[estrutura["porta"]==porta]
 
-        for _, c in comp.iterrows():
+        for _,c in comp.iterrows():
 
-            qtd_vidro = qtd_portas * c["quantidade"]
+            qtd_vidro=qtd*c["quantidade"]
 
             vidros.append({
-                "codigo": c["vidro_codigo"],
-                "tipo": c["tipo_vidro"],
-                "largura": c["largura"],
-                "altura": c["altura"],
-                "quantidade": qtd_vidro
+                "codigo":c["vidro_codigo"],
+                "tipo":c["tipo_vidro"],
+                "largura":c["largura"],
+                "altura":c["altura"],
+                "quantidade":qtd_vidro
             })
 
     return pd.DataFrame(vidros)
 
+# -----------------------
+# OTIMIZAÇÃO
+# -----------------------
 
-# ----------------------------
+def otimizar(df,largura,altura,tentativas=30):
+
+    melhor=None
+    menor_chapas=999999
+
+    for t in range(tentativas):
+
+        packer=newPacker(rotation=True)
+
+        linhas=df.sample(frac=1)
+
+        for _,r in linhas.iterrows():
+
+            for i in range(int(r["quantidade"])):
+
+                packer.add_rect(
+                    r["largura"],
+                    r["altura"],
+                    rid=r["codigo"]
+                )
+
+        packer.add_bin(largura,altura,float("inf"))
+
+        packer.pack()
+
+        chapas=len(packer)
+
+        if chapas<menor_chapas:
+
+            menor_chapas=chapas
+            melhor=packer
+
+    return melhor
+
+# -----------------------
+# DESENHO CHAPA
+# -----------------------
+
+def desenhar(packer,largura,altura,indice):
+
+    fig,ax=plt.subplots()
+
+    abin=packer[indice]
+
+    for rect in abin:
+
+        x=rect.x
+        y=rect.y
+        w=rect.width
+        h=rect.height
+
+        r=plt.Rectangle((x,y),w,h,fill=False)
+
+        ax.add_patch(r)
+
+        ax.text(
+            x+w/2,
+            y+h/2,
+            rect.rid,
+            ha="center",
+            va="center",
+            fontsize=8
+        )
+
+    ax.set_xlim(0,largura)
+    ax.set_ylim(0,altura)
+
+    ax.set_aspect('equal')
+
+    return fig
+
+# -----------------------
 # APP
-# ----------------------------
+# -----------------------
 
 st.title("📐 Otimizador de Corte de Vidro")
 
-estrutura = carregar()
+estrutura=carregar()
 
-aba1, aba2, aba3 = st.tabs([
-    "Produção",
-    "Cadastrar Porta",
-    "Gerenciar Itens"
+aba1,aba2,aba3=st.tabs([
+"Produção",
+"Cadastrar Porta",
+"Gerenciar"
 ])
 
-# ----------------------------
+# -----------------------
 # PRODUÇÃO
-# ----------------------------
+# -----------------------
 
 with aba1:
 
-    st.header("Pedido de produção")
-
-    porta = st.number_input("Código da porta", step=1)
-
-    qtd = st.number_input("Quantidade", step=1)
-
-    if st.button("Calcular vidros"):
-
-        pedido = pd.DataFrame({
-            "porta": [porta],
-            "quantidade": [qtd]
-        })
-
-        vidros = explodir_portas(pedido, estrutura)
-
-        st.subheader("Vidros necessários")
-
-        st.dataframe(vidros)
-
-        normal = vidros[vidros["tipo"] == "normal"]
-        tek = vidros[vidros["tipo"] == "tek"]
-
-        st.subheader("Resumo")
-
-        st.write("Vidros normais:", normal["quantidade"].sum())
-        st.write("Vidros tek:", tek["quantidade"].sum())
-
-
-# ----------------------------
-# CADASTRAR PORTA
-# ----------------------------
-
-with aba2:
-
-    st.header("Cadastrar porta")
-
-    porta = st.number_input("Código do pacote")
-
-    tipo = st.selectbox(
-        "Tipo de porta",
-        ["Simples", "Duplo", "Triplo"]
-    )
-
-    novos = []
-
-    if tipo == "Simples":
-
-        tipo_vidro = st.selectbox("Tipo vidro", ["normal", "tek"])
-
-        largura = st.number_input("largura")
-
-        altura = st.number_input("altura")
-
-        if st.button("Salvar porta"):
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+1,
-                "tipo_vidro": tipo_vidro,
-                "largura": largura,
-                "altura": altura,
-                "quantidade": 1
-            })
-
-
-    if tipo == "Duplo":
-
-        st.write("Vidro normal")
-
-        largura1 = st.number_input("largura normal")
-        altura1 = st.number_input("altura normal")
-
-        st.write("Vidro tek")
-
-        largura2 = st.number_input("largura tek")
-        altura2 = st.number_input("altura tek")
-
-        if st.button("Salvar porta"):
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+1,
-                "tipo_vidro": "normal",
-                "largura": largura1,
-                "altura": altura1,
-                "quantidade": 1
-            })
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+2,
-                "tipo_vidro": "tek",
-                "largura": largura2,
-                "altura": altura2,
-                "quantidade": 1
-            })
-
-
-    if tipo == "Triplo":
-
-        st.write("Vidro normal 1")
-
-        largura1 = st.number_input("largura normal 1")
-        altura1 = st.number_input("altura normal 1")
-
-        st.write("Vidro normal 2")
-
-        largura2 = st.number_input("largura normal 2")
-        altura2 = st.number_input("altura normal 2")
-
-        st.write("Vidro tek")
-
-        largura3 = st.number_input("largura tek")
-        altura3 = st.number_input("altura tek")
-
-        if st.button("Salvar porta"):
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+1,
-                "tipo_vidro": "normal",
-                "largura": largura1,
-                "altura": altura1,
-                "quantidade": 1
-            })
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+2,
-                "tipo_vidro": "normal",
-                "largura": largura2,
-                "altura": altura2,
-                "quantidade": 1
-            })
-
-            novos.append({
-                "porta": porta,
-                "vidro_codigo": porta*10+3,
-                "tipo_vidro": "tek",
-                "largura": largura3,
-                "altura": altura3,
-                "quantidade": 1
-            })
-
-
-    if len(novos) > 0:
-
-        estrutura = pd.concat([estrutura, pd.DataFrame(novos)])
-
-        salvar(estrutura)
-
-        st.success("Porta cadastrada!")
-
-
-# ----------------------------
-# GERENCIAR
-# ----------------------------
-
-with aba3:
-
-    st.header("Itens cadastrados")
-
-    st.dataframe(estrutura)
-
-    codigo = st.number_input("Código da porta para excluir")
-
-    if st.button("Excluir porta"):
-
-        estrutura = estrutura[estrutura["porta"] != codigo]
-
-        salvar(estrutura)
-
-        st.success("Porta removida!")
+    st.header("Lote de produçã
