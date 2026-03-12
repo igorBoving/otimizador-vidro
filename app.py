@@ -1,31 +1,34 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from rectpack import newPacker
 import numpy as np
-import random
 import os
+from rectpack import newPacker
 
 st.set_page_config(layout="wide")
 
-# -----------------------
-# CRIAR CSV SE NÃO EXISTIR
-# -----------------------
+# =========================
+# CRIAR ARQUIVOS SE NÃO EXISTIR
+# =========================
 
 if not os.path.exists("produtos.csv"):
-    df=pd.DataFrame(columns=[
-        "porta","vidro_codigo",
-        "tipo_vidro","largura",
-        "altura","quantidade"
-    ])
-    df.to_csv("produtos.csv",index=False)
+    pd.DataFrame(columns=[
+        "porta","vidro_codigo","tipo_vidro",
+        "largura","altura","quantidade"
+    ]).to_csv("produtos.csv",index=False)
+
+if not os.path.exists("chapas.csv"):
+    pd.DataFrame([
+        ["insulado",6000,3210],
+        ["tek",3300,2134]
+    ],columns=["tipo","largura","altura"]).to_csv("chapas.csv",index=False)
 
 produtos=pd.read_csv("produtos.csv")
 chapas=pd.read_csv("chapas.csv")
 
-# -----------------------
+# =========================
 # EXPLODIR PORTAS
-# -----------------------
+# =========================
 
 def explodir(pedido):
 
@@ -57,11 +60,11 @@ def explodir(pedido):
 
     return df
 
-# -----------------------
-# OTIMIZAÇÃO INDUSTRIAL
-# -----------------------
+# =========================
+# OTIMIZAÇÃO
+# =========================
 
-def otimizar(df,w,h,tentativas=1000):
+def otimizar(df,w,h,tentativas=200):
 
     melhor=None
     melhor_sucata=999
@@ -85,10 +88,9 @@ def otimizar(df,w,h,tentativas=1000):
                 )
 
         packer.add_bin(w,h,float("inf"))
-
         packer.pack()
 
-        chapas=len(packer)
+        chapas_usadas=len(packer)
 
         area_vidros=0
 
@@ -100,7 +102,7 @@ def otimizar(df,w,h,tentativas=1000):
                 r["quantidade"]
             )
 
-        area_total=chapas*area_chapa
+        area_total=chapas_usadas*area_chapa
 
         sucata=1-(area_vidros/area_total)
 
@@ -111,9 +113,9 @@ def otimizar(df,w,h,tentativas=1000):
 
     return melhor,melhor_sucata
 
-# -----------------------
+# =========================
 # DESENHAR CHAPA
-# -----------------------
+# =========================
 
 def desenhar(packer,w,h,i):
 
@@ -129,9 +131,7 @@ def desenhar(packer,w,h,i):
         rh=rect.height
 
         r=plt.Rectangle(
-            (x,y),
-            rw,
-            rh,
+            (x,y),rw,rh,
             edgecolor="black",
             facecolor=np.random.rand(3,)
         )
@@ -153,26 +153,26 @@ def desenhar(packer,w,h,i):
 
     return fig
 
-# -----------------------
+# =========================
 # INTERFACE
-# -----------------------
+# =========================
 
-st.title("🏭 Otimizador Industrial de Corte de Vidro")
+st.title("🏭 Sistema Industrial de Corte de Vidro")
 
 aba1,aba2,aba3,aba4=st.tabs([
 "Produção",
 "Produtos",
-"Cadastrar",
+"Cadastrar Porta",
 "Importar Excel"
 ])
 
-# -----------------------
-# PRODUÇÃO COM LOTE
-# -----------------------
+# =========================
+# PRODUÇÃO
+# =========================
 
 with aba1:
 
-    st.header("Lote de produção")
+    st.header("Lote de Produção")
 
     if "lote" not in st.session_state:
         st.session_state.lote=[]
@@ -180,10 +180,10 @@ with aba1:
     col1,col2,col3=st.columns(3)
 
     with col1:
-        porta=st.number_input("codigo porta",step=1)
+        porta=st.number_input("Código da porta",step=1)
 
     with col2:
-        qtd=st.number_input("quantidade",step=1)
+        qtd=st.number_input("Quantidade",step=1)
 
     with col3:
         if st.button("Adicionar ao lote"):
@@ -195,20 +195,35 @@ with aba1:
 
     lote_df=pd.DataFrame(st.session_state.lote)
 
-    st.subheader("Lote atual")
+    st.subheader("Pedidos do lote")
 
     st.dataframe(lote_df)
 
     if st.button("Limpar lote"):
         st.session_state.lote=[]
 
-    if st.button("Calcular lote"):
+    # =========================
+    # CALCULAR
+    # =========================
+
+    if "resultado" not in st.session_state:
+        st.session_state.resultado=None
+
+    if st.button("Calcular corte"):
 
         vidros=explodir(lote_df)
 
-        st.subheader("Vidros necessários")
+        resultado={}
 
-        st.dataframe(vidros)
+        area_total_vidros=0
+
+        for _,r in vidros.iterrows():
+
+            area_total_vidros+=(
+                r["largura"]*
+                r["altura"]*
+                r["quantidade"]
+            )
 
         for _,c in chapas.iterrows():
 
@@ -221,27 +236,41 @@ with aba1:
             if len(df)==0:
                 continue
 
-            st.subheader(f"Otimização {tipo}")
-
             packer,sucata=otimizar(
                 df,
                 c["largura"],
                 c["altura"]
             )
 
-            st.write(
-                "Chapas necessárias:",
-                len(packer)
-            )
+            resultado[tipo]={
+                "packer":packer,
+                "sucata":sucata,
+                "largura":c["largura"],
+                "altura":c["altura"]
+            }
 
-            st.write(
-                "Sucata:",
-                round(sucata*100,2),
-                "%"
-            )
+        st.session_state.resultado=resultado
+
+    # =========================
+    # MOSTRAR RESULTADO
+    # =========================
+
+    if st.session_state.resultado:
+
+        for tipo,dados in st.session_state.resultado.items():
+
+            packer=dados["packer"]
+            sucata=dados["sucata"]
+            largura=dados["largura"]
+            altura=dados["altura"]
+
+            st.subheader(f"Chapas {tipo}")
+
+            st.write("Chapas usadas:",len(packer))
+            st.write("Sucata:",round(sucata*100,2),"%")
 
             i=st.slider(
-                f"Ver chapa {tipo}",
+                f"Layout {tipo}",
                 0,
                 len(packer)-1,
                 0
@@ -249,16 +278,16 @@ with aba1:
 
             fig=desenhar(
                 packer,
-                c["largura"],
-                c["altura"],
+                largura,
+                altura,
                 i
             )
 
             st.pyplot(fig)
 
-# -----------------------
+# =========================
 # PRODUTOS
-# -----------------------
+# =========================
 
 with aba2:
 
@@ -266,15 +295,15 @@ with aba2:
 
     st.dataframe(produtos)
 
-    porta_del=st.number_input(
-        "codigo para excluir",
+    codigo=st.number_input(
+        "Excluir porta",
         step=1
     )
 
-    if st.button("Excluir produto"):
+    if st.button("Excluir"):
 
         produtos2=produtos[
-            produtos["porta"]!=porta_del
+            produtos["porta"]!=codigo
         ]
 
         produtos2.to_csv(
@@ -282,24 +311,24 @@ with aba2:
             index=False
         )
 
-        st.success("produto excluído")
+        st.success("Produto excluído")
 
-# -----------------------
-# CADASTRO
-# -----------------------
+# =========================
+# CADASTRAR PORTA
+# =========================
 
 with aba3:
 
-    st.header("Cadastrar porta")
+    st.header("Cadastrar nova porta")
 
     porta=st.number_input(
-        "codigo porta",
+        "Código da porta",
         step=1,
         key="cad"
     )
 
     tipo=st.selectbox(
-        "tipo",
+        "Tipo de porta",
         ["simples","duplo","triplo"]
     )
 
@@ -308,7 +337,7 @@ with aba3:
     if tipo=="simples":
 
         vidro=st.selectbox(
-            "tipo vidro",
+            "Tipo vidro",
             ["insulado","tek"]
         )
 
@@ -328,12 +357,12 @@ with aba3:
 
     if tipo=="duplo":
 
-        st.write("vidro insulado")
+        st.write("Vidro insulado")
 
         l1=st.number_input("largura1")
         a1=st.number_input("altura1")
 
-        st.write("vidro tek")
+        st.write("Vidro tek")
 
         l2=st.number_input("largura2")
         a2=st.number_input("altura2")
@@ -368,7 +397,7 @@ with aba3:
         l2=st.number_input("largura2")
         a2=st.number_input("altura2")
 
-        st.write("vidro tek")
+        st.write("Vidro tek")
 
         l3=st.number_input("largura3")
         a3=st.number_input("altura3")
@@ -425,18 +454,18 @@ with aba3:
             index=False
         )
 
-        st.success("porta cadastrada")
+        st.success("Porta cadastrada")
 
-# -----------------------
+# =========================
 # IMPORTAR EXCEL
-# -----------------------
+# =========================
 
 with aba4:
 
     st.header("Importar pedidos")
 
     file=st.file_uploader(
-        "arquivo excel"
+        "Arquivo Excel"
     )
 
     if file:
