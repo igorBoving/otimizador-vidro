@@ -7,9 +7,9 @@ from rectpack import newPacker
 
 st.set_page_config(layout="wide")
 
-# =========================
-# CRIAR BASES SE NÃO EXISTIR
-# =========================
+# ======================
+# CRIAR BASES
+# ======================
 
 if not os.path.exists("produtos.csv"):
     pd.DataFrame(columns=[
@@ -25,9 +25,9 @@ if not os.path.exists("chapas.csv"):
 produtos=pd.read_csv("produtos.csv")
 chapas=pd.read_csv("chapas.csv")
 
-# =========================
-# FUNÇÃO EXPLODIR PORTAS
-# =========================
+# ======================
+# EXPLODIR PORTAS
+# ======================
 
 def explodir(pedido):
 
@@ -63,9 +63,9 @@ def explodir(pedido):
     return df
 
 
-# =========================
-# OTIMIZAÇÃO
-# =========================
+# ======================
+# OTIMIZAR CORTE
+# ======================
 
 def otimizar(df,w,h):
 
@@ -109,9 +109,9 @@ def otimizar(df,w,h):
     return packer,sucata
 
 
-# =========================
+# ======================
 # DESENHAR CHAPA
-# =========================
+# ======================
 
 def desenhar(packer,w,h,i):
 
@@ -152,26 +152,28 @@ def desenhar(packer,w,h,i):
     return fig
 
 
-# =========================
+# ======================
 # INTERFACE
-# =========================
+# ======================
 
-st.title("Sistema de Otimização de Corte de Vidro")
+st.title("Otimizador de Corte de Vidro")
 
-aba1,aba2,aba3,aba4=st.tabs([
+aba1,aba2,aba3,aba4,aba5,aba6=st.tabs([
 "Produção",
-"Cadastrar Porta",
-"Produtos",
-"Cadastrar Chapas"
+"Cadastrar vidro na porta",
+"Produtos cadastrados",
+"Cadastrar chapas",
+"Importar portas",
+"Importar chapas"
 ])
 
-# =========================
+# ======================
 # PRODUÇÃO
-# =========================
+# ======================
 
 with aba1:
 
-    st.header("Produção")
+    st.header("Lote de produção")
 
     if "lote" not in st.session_state:
         st.session_state.lote=[]
@@ -189,11 +191,11 @@ with aba1:
         qtd=st.number_input(
             "Quantidade",
             step=1,
-            key="quantidade_producao"
+            key="qtd_producao"
         )
 
     with col3:
-        if st.button("Adicionar ao lote",key="btn_add_lote"):
+        if st.button("Adicionar ao lote",key="add_lote"):
 
             st.session_state.lote.append({
                 "porta":porta,
@@ -205,15 +207,15 @@ with aba1:
     st.dataframe(lote_df)
 
     if st.button("Limpar lote",key="limpar_lote"):
-
         st.session_state.lote=[]
 
-    if st.button("Calcular corte",key="calcular_corte"):
+    if st.button("Calcular corte",key="calc_corte"):
 
         vidros=explodir(lote_df)
 
         if len(vidros)==0:
             st.warning("Nenhum vidro encontrado")
+
         else:
 
             for _,c in chapas.iterrows():
@@ -260,13 +262,13 @@ with aba1:
                     st.pyplot(fig)
 
 
-# =========================
-# CADASTRAR PORTA
-# =========================
+# ======================
+# CADASTRAR VIDRO NA PORTA
+# ======================
 
 with aba2:
 
-    st.header("Cadastrar porta")
+    st.header("Adicionar vidro em uma porta")
 
     porta=st.number_input(
         "Código da porta",
@@ -274,20 +276,15 @@ with aba2:
         key="porta_cadastro"
     )
 
-    tipo_porta=st.selectbox(
-        "Tipo da porta",
-        ["simples","dupla","tripla"],
-        key="tipo_porta"
+    vidro_codigo=st.text_input(
+        "Código do vidro",
+        key="codigo_vidro"
     )
 
-    largura=st.number_input(
-        "Largura vidro",
-        key="largura_vidro"
-    )
-
-    altura=st.number_input(
-        "Altura vidro",
-        key="altura_vidro"
+    tipo_vidro=st.selectbox(
+        "Tipo vidro",
+        ["incolor","tek"],
+        key="tipo_vidro"
     )
 
     esp=st.selectbox(
@@ -296,82 +293,36 @@ with aba2:
         key="esp_vidro"
     )
 
-    if st.button("Salvar porta",key="salvar_porta"):
+    largura=st.number_input(
+        "Largura",
+        key="largura_vidro"
+    )
 
-        linhas=[]
+    altura=st.number_input(
+        "Altura",
+        key="altura_vidro"
+    )
 
-        if tipo_porta=="simples":
+    qtd=st.number_input(
+        "Quantidade",
+        step=1,
+        key="qtd_vidro"
+    )
 
-            linhas.append([
-                porta,f"{porta}_1",
-                "incolor",
-                esp,
-                largura,
-                altura,
-                1
-            ])
+    if st.button("Salvar vidro",key="salvar_vidro"):
 
-        if tipo_porta=="dupla":
-
-            linhas.append([
-                porta,f"{porta}_INC",
-                "incolor",
-                esp,
-                largura,
-                altura,
-                1
-            ])
-
-            linhas.append([
-                porta,f"{porta}_TEK",
-                "tek",
-                esp,
-                largura,
-                altura,
-                1
-            ])
-
-        if tipo_porta=="tripla":
-
-            linhas.append([
-                porta,f"{porta}_INC1",
-                "incolor",
-                esp,
-                largura,
-                altura,
-                1
-            ])
-
-            linhas.append([
-                porta,f"{porta}_INC2",
-                "incolor",
-                esp,
-                largura,
-                altura,
-                1
-            ])
-
-            linhas.append([
-                porta,f"{porta}_TEK",
-                "tek",
-                esp,
-                largura,
-                altura,
-                1
-            ])
-
-        novo=pd.DataFrame(
-            linhas,
-            columns=[
-                "porta",
-                "vidro_codigo",
-                "tipo_vidro",
-                "espessura",
-                "largura",
-                "altura",
-                "quantidade"
-            ]
-        )
+        novo=pd.DataFrame([[
+            porta,
+            vidro_codigo,
+            tipo_vidro,
+            esp,
+            largura,
+            altura,
+            qtd
+        ]],columns=[
+            "porta","vidro_codigo","tipo_vidro",
+            "espessura","largura","altura","quantidade"
+        ])
 
         produtos2=pd.concat([produtos,novo])
 
@@ -380,12 +331,12 @@ with aba2:
             index=False
         )
 
-        st.success("Porta cadastrada")
+        st.success("Vidro adicionado")
 
 
-# =========================
-# VER PRODUTOS
-# =========================
+# ======================
+# PRODUTOS
+# ======================
 
 with aba3:
 
@@ -394,13 +345,11 @@ with aba3:
     st.dataframe(produtos)
 
 
-# =========================
+# ======================
 # CADASTRAR CHAPAS
-# =========================
+# ======================
 
 with aba4:
-
-    st.header("Cadastrar chapas")
 
     tipo=st.selectbox(
         "Tipo vidro",
@@ -432,21 +381,81 @@ with aba4:
             largura,
             altura
         ]],columns=[
-            "tipo",
-            "espessura",
-            "largura",
-            "altura"
+            "tipo","espessura","largura","altura"
         ])
 
         chapas2=pd.concat([chapas,nova])
 
         chapas2.to_csv(
             "chapas.csv",
-            index=False
-        )
+            index=False)
 
         st.success("Chapa cadastrada")
 
-    st.subheader("Chapas cadastradas")
-
     st.dataframe(chapas)
+
+
+# ======================
+# IMPORTAR PORTAS
+# ======================
+
+with aba5:
+
+    st.header("Importar portas por Excel")
+
+    file=st.file_uploader(
+        "Selecione a planilha",
+        type=["xlsx","csv"],
+        key="import_produtos"
+    )
+
+    if file:
+
+        if file.name.endswith(".csv"):
+            df=pd.read_csv(file)
+        else:
+            df=pd.read_excel(file)
+
+        st.dataframe(df)
+
+        if st.button("Salvar portas",key="salvar_import"):
+
+            df.to_csv(
+                "produtos.csv",
+                index=False
+            )
+
+            st.success("Portas importadas")
+
+
+# ======================
+# IMPORTAR CHAPAS
+# ======================
+
+with aba6:
+
+    st.header("Importar chapas")
+
+    file=st.file_uploader(
+        "Planilha chapas",
+        type=["xlsx","csv"],
+        key="import_chapas"
+    )
+
+    if file:
+
+        if file.name.endswith(".csv"):
+            df=pd.read_csv(file)
+        else:
+            df=pd.read_excel(file)
+
+        st.dataframe(df)
+
+        if st.button("Salvar chapas",key="salvar_chapas_import"):
+
+            df.to_csv(
+                "chapas.csv",
+                index=False
+            )
+
+            st.success("Chapas importadas")
