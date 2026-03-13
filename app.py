@@ -5,6 +5,10 @@ import os
 
 st.set_page_config(layout="wide")
 
+# =============================
+# COLUNAS PADRÃO
+# =============================
+
 COL_PRODUTOS=["porta","tipo","vidro","espessura","largura","altura"]
 COL_CHAPAS=["nome","vidro","espessura","largura","altura"]
 
@@ -32,11 +36,15 @@ for c in COL_CHAPAS:
 produtos=produtos[COL_PRODUTOS]
 chapas=chapas[COL_CHAPAS]
 
+# =============================
+# SESSION
+# =============================
+
 if "lote" not in st.session_state:
     st.session_state.lote=[]
 
 # =============================
-# TABS
+# MENU
 # =============================
 
 aba1,aba2,aba3,aba4,aba5=st.tabs([
@@ -48,7 +56,7 @@ aba1,aba2,aba3,aba4,aba5=st.tabs([
 ])
 
 # =============================
-# CADASTRO PORTA
+# CADASTRAR PORTA
 # =============================
 
 with aba1:
@@ -67,11 +75,15 @@ with aba1:
         key="cad_tipo"
     )
 
-    qtd={"simples":1,"dupla":2,"tripla":3}
+    qtd_vidro={
+        "simples":1,
+        "dupla":2,
+        "tripla":3
+    }
 
     lista=[]
 
-    for i in range(qtd[tipo]):
+    for i in range(qtd_vidro[tipo]):
 
         st.subheader(f"Vidro {i+1}")
 
@@ -119,7 +131,7 @@ with aba1:
         st.success("Porta cadastrada")
 
 # =============================
-# IMPORTAR
+# IMPORTAR EXCEL
 # =============================
 
 with aba2:
@@ -203,7 +215,7 @@ with aba4:
 
     st.header("Cadastro chapas")
 
-    nome=st.text_input("Nome",key="chapa_nome")
+    nome=st.text_input("Nome chapa",key="chapa_nome")
 
     vidro=st.selectbox(
         "Tipo vidro",
@@ -264,78 +276,97 @@ with aba5:
 
     if st.button("Gerar vidros",key="btn_gerar_vidros"):
 
-        lista=[]
-
-        for item in st.session_state.lote:
-
-            dados=produtos[produtos["porta"]==item["porta"]]
-
-            for _,r in dados.iterrows():
-
-                larg=float(r["largura"])
-                alt=float(r["altura"])
-
-                for i in range(int(item["quantidade"])):
-
-                    lista.append({
-                        "largura":larg,
-                        "altura":alt
-                    })
-
-        df=pd.DataFrame(lista)
-
-        st.subheader("Vidros do lote")
-
-        st.dataframe(df)
-
         if len(chapas)==0:
             st.warning("Nenhuma chapa cadastrada")
             st.stop()
 
         chapa=chapas.iloc[0]
 
-        largura=float(chapa["largura"])
-        altura=float(chapa["altura"])
+        largura_chapa=float(chapa["largura"])
+        altura_chapa=float(chapa["altura"])
 
-        fig,ax=plt.subplots()
+        # separar por porta
+        for item in st.session_state.lote:
 
-        ax.add_patch(
-            plt.Rectangle((0,0),largura,altura,fill=False,linewidth=2)
-        )
+            codigo=item["porta"]
+            qtd=item["quantidade"]
 
-        x=0
-        y=0
+            dados=produtos[produtos["porta"]==codigo]
 
-        area_vidros=0
+            if dados.empty:
+                continue
 
-        for _,v in df.iterrows():
+            st.subheader(f"Porta {codigo}")
 
-            w=float(v["largura"])
-            h=float(v["altura"])
+            lista=[]
 
-            if x+w>largura:
-                x=0
-                y+=h
+            for _,r in dados.iterrows():
 
-            if y+h>altura:
-                break
+                larg=float(r["largura"])
+                alt=float(r["altura"])
 
-            ax.add_patch(plt.Rectangle((x,y),w,h))
+                for i in range(int(qtd)):
 
-            area_vidros+=w*h
+                    lista.append({
+                        "largura":larg,
+                        "altura":alt
+                    })
 
-            x+=w
+            df=pd.DataFrame(lista)
 
-        ax.set_xlim(0,largura)
-        ax.set_ylim(0,altura)
+            st.dataframe(df)
 
-        st.pyplot(fig)
+            fig,ax=plt.subplots()
 
-        area_chapa=largura*altura
+            ax.add_patch(
+                plt.Rectangle(
+                    (0,0),
+                    largura_chapa,
+                    altura_chapa,
+                    fill=False,
+                    linewidth=3
+                )
+            )
 
-        aproveitamento=(area_vidros/area_chapa)*100
+            x=0
+            y=0
 
-        sucata=100-aproveitamento
+            area_vidros=0
 
-        st.write(f"Aproveitamento: {aproveitamento:.2f}%")
-        st.write(f"Sucata: {sucata:.2f}%")
+            for _,v in df.iterrows():
+
+                w=float(v["largura"])
+                h=float(v["altura"])
+
+                if x+w>largura_chapa:
+                    x=0
+                    y+=h
+
+                if y+h>altura_chapa:
+                    break
+
+                ax.add_patch(
+                    plt.Rectangle((x,y),w,h)
+                )
+
+                area_vidros+=w*h
+
+                x+=w
+
+            ax.set_xlim(0,largura_chapa)
+            ax.set_ylim(0,altura_chapa)
+
+            ax.set_title(f"Layout porta {codigo}")
+
+            st.pyplot(fig)
+
+            area_chapa=largura_chapa*altura_chapa
+
+            aproveitamento=(area_vidros/area_chapa)*100
+
+            sucata=100-aproveitamento
+
+            st.write(f"Aproveitamento: {aproveitamento:.2f}%")
+            st.write(f"Sucata: {sucata:.2f}%")
+
+            st.divider()
