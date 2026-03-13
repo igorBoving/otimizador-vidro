@@ -5,15 +5,11 @@ import os
 
 st.set_page_config(layout="wide")
 
-# =============================
-# COLUNAS PADRÃO
-# =============================
-
 COL_PRODUTOS=["porta","tipo","vidro","espessura","largura","altura"]
 COL_CHAPAS=["nome","vidro","espessura","largura","altura"]
 
 # =============================
-# CRIAR ARQUIVOS SE NÃO EXISTIR
+# CRIAR ARQUIVOS
 # =============================
 
 if not os.path.exists("produtos.csv"):
@@ -25,7 +21,6 @@ if not os.path.exists("chapas.csv"):
 produtos=pd.read_csv("produtos.csv")
 chapas=pd.read_csv("chapas.csv")
 
-# garantir colunas
 for c in COL_PRODUTOS:
     if c not in produtos.columns:
         produtos[c]=""
@@ -37,15 +32,11 @@ for c in COL_CHAPAS:
 produtos=produtos[COL_PRODUTOS]
 chapas=chapas[COL_CHAPAS]
 
-# =============================
-# SESSION
-# =============================
-
 if "lote" not in st.session_state:
     st.session_state.lote=[]
 
 # =============================
-# MENU
+# TABS
 # =============================
 
 aba1,aba2,aba3,aba4,aba5=st.tabs([
@@ -64,19 +55,23 @@ with aba1:
 
     st.header("Cadastrar porta")
 
-    porta=st.number_input("Código da porta",step=1)
+    porta=st.number_input(
+        "Código da porta",
+        step=1,
+        key="cad_porta"
+    )
 
-    tipo=st.selectbox("Tipo",["simples","dupla","tripla"])
+    tipo=st.selectbox(
+        "Tipo",
+        ["simples","dupla","tripla"],
+        key="cad_tipo"
+    )
 
-    qtd_vidro={
-        "simples":1,
-        "dupla":2,
-        "tripla":3
-    }
+    qtd={"simples":1,"dupla":2,"tripla":3}
 
     lista=[]
 
-    for i in range(qtd_vidro[tipo]):
+    for i in range(qtd[tipo]):
 
         st.subheader(f"Vidro {i+1}")
 
@@ -85,23 +80,23 @@ with aba1:
         vidro=c1.selectbox(
             "Tipo vidro",
             ["Incolor","Tek"],
-            key=f"vidro{i}"
+            key=f"cad_vidro{i}"
         )
 
         esp=c2.selectbox(
             "Espessura",
             [4,6,8],
-            key=f"esp{i}"
+            key=f"cad_esp{i}"
         )
 
         larg=c3.number_input(
             "Largura",
-            key=f"larg{i}"
+            key=f"cad_larg{i}"
         )
 
         alt=c4.number_input(
             "Altura",
-            key=f"alt{i}"
+            key=f"cad_alt{i}"
         )
 
         lista.append({
@@ -113,7 +108,7 @@ with aba1:
             "altura":alt
         })
 
-    if st.button("Salvar porta"):
+    if st.button("Salvar porta",key="btn_salvar_porta"):
 
         df=pd.DataFrame(lista)
 
@@ -124,14 +119,17 @@ with aba1:
         st.success("Porta cadastrada")
 
 # =============================
-# IMPORTAR PLANILHA
+# IMPORTAR
 # =============================
 
 with aba2:
 
-    st.header("Importar planilha Excel")
+    st.header("Importar Excel")
 
-    arquivo=st.file_uploader("Selecionar arquivo")
+    arquivo=st.file_uploader(
+        "Selecionar planilha",
+        key="import_excel"
+    )
 
     if arquivo:
 
@@ -159,11 +157,13 @@ with aba3:
 
     st.dataframe(produtos)
 
-    st.subheader("Excluir porta")
+    cod=st.number_input(
+        "Excluir porta",
+        step=1,
+        key="excluir_porta"
+    )
 
-    cod=st.number_input("Código da porta",step=1)
-
-    if st.button("Excluir"):
+    if st.button("Excluir",key="btn_excluir"):
 
         produtos2=produtos[produtos["porta"]!=cod]
 
@@ -173,18 +173,27 @@ with aba3:
 
     st.subheader("Adicionar ao lote")
 
-    cod_lote=st.number_input("Código porta lote",step=1)
+    cod_lote=st.number_input(
+        "Código porta lote",
+        step=1,
+        key="lote_porta"
+    )
 
-    qtd=st.number_input("Quantidade",step=1,value=1)
+    qtd=st.number_input(
+        "Quantidade",
+        step=1,
+        value=1,
+        key="lote_qtd"
+    )
 
-    if st.button("Adicionar ao lote"):
+    if st.button("Adicionar ao lote",key="btn_add_lote"):
 
         st.session_state.lote.append({
             "porta":cod_lote,
             "quantidade":qtd
         })
 
-        st.success("Adicionado")
+        st.success("Adicionado ao lote")
 
 # =============================
 # CHAPAS
@@ -194,17 +203,25 @@ with aba4:
 
     st.header("Cadastro chapas")
 
-    nome=st.text_input("Nome chapa")
+    nome=st.text_input("Nome",key="chapa_nome")
 
-    vidro=st.selectbox("Tipo vidro",["Incolor","Tek"])
+    vidro=st.selectbox(
+        "Tipo vidro",
+        ["Incolor","Tek"],
+        key="chapa_vidro"
+    )
 
-    esp=st.selectbox("Espessura",[4,6,8])
+    esp=st.selectbox(
+        "Espessura",
+        [4,6,8],
+        key="chapa_esp"
+    )
 
-    larg=st.number_input("Largura")
+    larg=st.number_input("Largura",key="chapa_larg")
 
-    alt=st.number_input("Altura")
+    alt=st.number_input("Altura",key="chapa_alt")
 
-    if st.button("Salvar chapa"):
+    if st.button("Salvar chapa",key="btn_salvar_chapa"):
 
         nova=pd.DataFrame([{
             "nome":nome,
@@ -239,13 +256,13 @@ with aba5:
         item["quantidade"]=c2.number_input(
             "Qtd",
             value=item["quantidade"],
-            key=f"q{i}"
+            key=f"lote_q{i}"
         )
 
-        if c3.button("Remover",key=f"r{i}"):
+        if c3.button("Remover",key=f"rem{i}"):
             st.session_state.lote.remove(item)
 
-    if st.button("Gerar vidros"):
+    if st.button("Gerar vidros",key="btn_gerar_vidros"):
 
         lista=[]
 
@@ -255,33 +272,17 @@ with aba5:
 
             for _,r in dados.iterrows():
 
-                vidro=str(r.get("vidro","Incolor"))
-                esp=float(r.get("espessura",4))
-
-                try:
-                    larg=float(r.get("largura",0))
-                    alt=float(r.get("altura",0))
-                except:
-                    larg=0
-                    alt=0
-
-                if larg==0 or alt==0:
-                    continue
+                larg=float(r["largura"])
+                alt=float(r["altura"])
 
                 for i in range(int(item["quantidade"])):
 
                     lista.append({
-                        "vidro":vidro,
-                        "espessura":esp,
                         "largura":larg,
                         "altura":alt
                     })
 
         df=pd.DataFrame(lista)
-
-        if df.empty:
-            st.error("Nenhum vidro válido encontrado")
-            st.stop()
 
         st.subheader("Vidros do lote")
 
@@ -293,19 +294,13 @@ with aba5:
 
         chapa=chapas.iloc[0]
 
-        largura_chapa=float(chapa["largura"])
-        altura_chapa=float(chapa["altura"])
+        largura=float(chapa["largura"])
+        altura=float(chapa["altura"])
 
         fig,ax=plt.subplots()
 
         ax.add_patch(
-            plt.Rectangle(
-                (0,0),
-                largura_chapa,
-                altura_chapa,
-                fill=False,
-                linewidth=2
-            )
+            plt.Rectangle((0,0),largura,altura,fill=False,linewidth=2)
         )
 
         x=0
@@ -318,29 +313,25 @@ with aba5:
             w=float(v["largura"])
             h=float(v["altura"])
 
-            if x+w>largura_chapa:
+            if x+w>largura:
                 x=0
                 y+=h
 
-            if y+h>altura_chapa:
+            if y+h>altura:
                 break
 
-            ax.add_patch(
-                plt.Rectangle((x,y),w,h)
-            )
+            ax.add_patch(plt.Rectangle((x,y),w,h))
 
             area_vidros+=w*h
 
             x+=w
 
-        ax.set_xlim(0,largura_chapa)
-        ax.set_ylim(0,altura_chapa)
-
-        ax.set_title("Layout da chapa")
+        ax.set_xlim(0,largura)
+        ax.set_ylim(0,altura)
 
         st.pyplot(fig)
 
-        area_chapa=largura_chapa*altura_chapa
+        area_chapa=largura*altura
 
         aproveitamento=(area_vidros/area_chapa)*100
 
