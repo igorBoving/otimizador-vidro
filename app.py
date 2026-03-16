@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
 
-# -----------------------------
+# -------------------------
 # SESSION STATE
-# -----------------------------
+# -------------------------
 
 if "portas" not in st.session_state:
     st.session_state.portas = []
@@ -17,9 +17,9 @@ if "chapas" not in st.session_state:
 if "lote" not in st.session_state:
     st.session_state.lote = []
 
-# -----------------------------
+# -------------------------
 # MENU
-# -----------------------------
+# -------------------------
 
 menu = st.sidebar.selectbox(
     "Menu",
@@ -32,9 +32,9 @@ menu = st.sidebar.selectbox(
     ]
 )
 
-# -----------------------------
+# -------------------------
 # IMPORTAR PORTAS
-# -----------------------------
+# -------------------------
 
 if menu == "Importar Portas Excel":
 
@@ -71,9 +71,9 @@ if menu == "Importar Portas Excel":
 
         st.success("Portas importadas!")
 
-# -----------------------------
+# -------------------------
 # CADASTRO CHAPAS
-# -----------------------------
+# -------------------------
 
 if menu == "Cadastro de Chapas":
 
@@ -128,9 +128,9 @@ if menu == "Cadastro de Chapas":
             st.session_state.chapas.pop(i)
             st.rerun()
 
-# -----------------------------
+# -------------------------
 # CADASTRO PORTAS
-# -----------------------------
+# -------------------------
 
 if menu == "Cadastro de Portas":
 
@@ -198,9 +198,9 @@ if menu == "Cadastro de Portas":
 
         st.success("Porta cadastrada")
 
-# -----------------------------
+# -------------------------
 # PORTAS CADASTRADAS
-# -----------------------------
+# -------------------------
 
 if menu == "Portas Cadastradas":
 
@@ -210,13 +210,18 @@ if menu == "Portas Cadastradas":
 
         col1,col2,col3 = st.columns([3,2,1])
 
-        col1.write(f"Código {p['codigo']}")
+        col1.write(f"Código {p.get('codigo','SEM CODIGO')}")
 
         if col2.button(
             "Adicionar ao lote",
             key=f"add{i}"
         ):
-            st.session_state.lote.append(p)
+
+            st.session_state.lote.append({
+                "codigo":p.get("codigo","SEM CODIGO"),
+                "laminas":p["laminas"],
+                "qtd":1
+            })
 
         if col3.button(
             "Excluir",
@@ -225,9 +230,9 @@ if menu == "Portas Cadastradas":
             st.session_state.portas.pop(i)
             st.rerun()
 
-# -----------------------------
-# GERAR LOTE
-# -----------------------------
+# -------------------------
+# LOTE
+# -------------------------
 
 if menu == "Lote de Produção":
 
@@ -238,16 +243,20 @@ if menu == "Lote de Produção":
 
     for i,p in enumerate(st.session_state.lote):
 
-        col1,col2 = st.columns([4,1])
+        col1,col2,col3,col4 = st.columns([3,1,1,1])
 
-        col1.write(f"Porta {p['codigo']}")
+        col1.write(f"Porta {p.get('codigo','SEM CODIGO')}")
 
-        if col2.button(
-            "Remover",
-            key=f"rem{i}"
-        ):
-            st.session_state.lote.pop(i)
-            st.rerun()
+        if col2.button("-",key=f"menos{i}"):
+
+            if p["qtd"]>1:
+                p["qtd"]-=1
+
+        col3.write(p["qtd"])
+
+        if col4.button("+",key=f"mais{i}"):
+
+            p["qtd"]+=1
 
     if st.button("Gerar Corte"):
 
@@ -255,14 +264,18 @@ if menu == "Lote de Produção":
 
         for porta in st.session_state.lote:
 
-            for l in porta["laminas"]:
+            qtd=porta.get("qtd",1)
 
-                pecas.append({
-                    "vidro":l["vidro"],
-                    "esp":l["esp"],
-                    "larg":l["larg"],
-                    "alt":l["alt"]
-                })
+            for _ in range(qtd):
+
+                for l in porta["laminas"]:
+
+                    pecas.append({
+                        "vidro":l["vidro"],
+                        "esp":l["esp"],
+                        "larg":l["larg"],
+                        "alt":l["alt"]
+                    })
 
         df=pd.DataFrame(pecas)
 
@@ -304,7 +317,6 @@ if menu == "Lote de Produção":
                 w=r["larg"]
                 h=r["alt"]
 
-                # tentativa normal
                 if w>h:
                     w,h=h,w
 
