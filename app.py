@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
 
-# ------------------------------
-# Inicialização
-# ------------------------------
+# -----------------------------
+# SESSION STATE
+# -----------------------------
 
 if "portas" not in st.session_state:
     st.session_state.portas = []
@@ -17,14 +17,14 @@ if "chapas" not in st.session_state:
 if "lote" not in st.session_state:
     st.session_state.lote = []
 
-
-# ------------------------------
+# -----------------------------
 # MENU
-# ------------------------------
+# -----------------------------
 
 menu = st.sidebar.selectbox(
     "Menu",
     [
+        "Importar Portas Excel",
         "Cadastro de Chapas",
         "Cadastro de Portas",
         "Portas Cadastradas",
@@ -32,86 +32,124 @@ menu = st.sidebar.selectbox(
     ]
 )
 
-# ------------------------------
-# CADASTRO DE CHAPAS
-# ------------------------------
+# -----------------------------
+# IMPORTAR PORTAS
+# -----------------------------
+
+if menu == "Importar Portas Excel":
+
+    st.title("Importar portas do Excel")
+
+    arquivo = st.file_uploader(
+        "Selecione a planilha",
+        type=["xlsx"]
+    )
+
+    if arquivo:
+
+        df = pd.read_excel(arquivo)
+
+        grupos = df.groupby("codigo")
+
+        for cod, dados in grupos:
+
+            laminas = []
+
+            for _, r in dados.iterrows():
+
+                laminas.append({
+                    "vidro": r["vidro"],
+                    "esp": r["espessura"],
+                    "larg": r["largura"],
+                    "alt": r["altura"]
+                })
+
+            st.session_state.portas.append({
+                "codigo": cod,
+                "laminas": laminas
+            })
+
+        st.success("Portas importadas!")
+
+# -----------------------------
+# CADASTRO CHAPAS
+# -----------------------------
 
 if menu == "Cadastro de Chapas":
 
     st.title("Cadastro de Chapas")
 
-    col1, col2 = st.columns(2)
+    col1,col2 = st.columns(2)
 
-    with col1:
-        tipo_vidro = st.selectbox(
-            "Tipo de vidro",
-            ["Incolor", "Tek"],
-            key="tipo_chapa"
-        )
+    vidro = col1.selectbox(
+        "Tipo vidro",
+        ["Incolor","Tek"]
+    )
 
-        espessura = st.selectbox(
-            "Espessura (mm)",
-            [4,6,8],
-            key="esp_chapa"
-        )
+    esp = col2.selectbox(
+        "Espessura",
+        [4,6,8]
+    )
 
-    with col2:
-        largura = st.number_input(
-            "Largura da chapa (mm)",
-            value=6000
-        )
+    col3,col4 = st.columns(2)
 
-        altura = st.number_input(
-            "Altura da chapa (mm)",
-            value=3210
-        )
+    largura = col3.number_input(
+        "Largura chapa",
+        value=6000
+    )
+
+    altura = col4.number_input(
+        "Altura chapa",
+        value=3210
+    )
 
     if st.button("Cadastrar chapa"):
 
         st.session_state.chapas.append({
-            "vidro": tipo_vidro,
-            "esp": espessura,
+            "vidro": vidro,
+            "esp": esp,
             "largura": largura,
             "altura": altura
         })
 
     st.subheader("Chapas cadastradas")
 
-    for i, c in enumerate(st.session_state.chapas):
+    for i,c in enumerate(st.session_state.chapas):
 
         col1,col2,col3 = st.columns([3,3,1])
 
         col1.write(f"{c['vidro']} {c['esp']}mm")
         col2.write(f"{c['largura']} x {c['altura']}")
 
-        if col3.button("Excluir", key=f"exc_chapa{i}"):
+        if col3.button(
+            "Excluir",
+            key=f"exc_chapa{i}"
+        ):
             st.session_state.chapas.pop(i)
             st.rerun()
 
-
-# ------------------------------
-# CADASTRO DE PORTAS
-# ------------------------------
+# -----------------------------
+# CADASTRO PORTAS
+# -----------------------------
 
 if menu == "Cadastro de Portas":
 
     st.title("Cadastro de Porta")
 
     codigo = st.number_input(
-        "Código da porta",
-        step=1,
-        key="cod_porta"
+        "Código",
+        step=1
     )
 
-    tipo_porta = st.selectbox(
+    tipo = st.selectbox(
         "Tipo",
         ["Simples","Dupla","Tripla"]
     )
 
     laminas = 1
-    if tipo_porta == "Dupla":
+    if tipo == "Dupla":
         laminas = 2
-    if tipo_porta == "Tripla":
+    if tipo == "Tripla":
         laminas = 3
 
     dados = []
@@ -160,10 +198,9 @@ if menu == "Cadastro de Portas":
 
         st.success("Porta cadastrada")
 
-
-# ------------------------------
-# LISTA DE PORTAS
-# ------------------------------
+# -----------------------------
+# PORTAS CADASTRADAS
+# -----------------------------
 
 if menu == "Portas Cadastradas":
 
@@ -177,28 +214,27 @@ if menu == "Portas Cadastradas":
 
         if col2.button(
             "Adicionar ao lote",
-            key=f"lote{i}"
+            key=f"add{i}"
         ):
             st.session_state.lote.append(p)
 
         if col3.button(
             "Excluir",
-            key=f"exc_porta{i}"
+            key=f"exc{i}"
         ):
             st.session_state.portas.pop(i)
             st.rerun()
 
-
-# ------------------------------
-# LOTE DE PRODUÇÃO
-# ------------------------------
+# -----------------------------
+# GERAR LOTE
+# -----------------------------
 
 if menu == "Lote de Produção":
 
     st.title("Lote de produção")
 
-    if len(st.session_state.lote) == 0:
-        st.info("Nenhuma porta no lote")
+    if len(st.session_state.lote)==0:
+        st.info("Lote vazio")
 
     for i,p in enumerate(st.session_state.lote):
 
@@ -213,11 +249,12 @@ if menu == "Lote de Produção":
             st.session_state.lote.pop(i)
             st.rerun()
 
-    if st.button("Gerar corte"):
+    if st.button("Gerar Corte"):
 
-        pecas = []
+        pecas=[]
 
         for porta in st.session_state.lote:
+
             for l in porta["laminas"]:
 
                 pecas.append({
@@ -227,17 +264,17 @@ if menu == "Lote de Produção":
                     "alt":l["alt"]
                 })
 
-        df = pd.DataFrame(pecas)
+        df=pd.DataFrame(pecas)
 
-        grupos = df.groupby(["vidro","esp"])
+        grupos=df.groupby(["vidro","esp"])
 
         for g,dados in grupos:
 
-            vidro,esp = g
+            vidro,esp=g
 
             st.subheader(f"{vidro} {esp}mm")
 
-            chapa = None
+            chapa=None
 
             for c in st.session_state.chapas:
 
@@ -245,16 +282,16 @@ if menu == "Lote de Produção":
                     chapa=c
 
             if chapa is None:
-                st.warning("Sem chapa cadastrada")
+                st.warning("Chapa não cadastrada")
                 continue
 
-            largura = chapa["largura"]
-            altura = chapa["altura"]
+            W=chapa["largura"]
+            H=chapa["altura"]
 
-            fig,ax = plt.subplots()
+            fig,ax=plt.subplots()
 
-            ax.set_xlim(0,largura)
-            ax.set_ylim(0,altura)
+            ax.set_xlim(0,W)
+            ax.set_ylim(0,H)
 
             x=0
             y=0
@@ -267,15 +304,19 @@ if menu == "Lote de Produção":
                 w=r["larg"]
                 h=r["alt"]
 
-                if x+w>largura:
+                # tentativa normal
+                if w>h:
+                    w,h=h,w
+
+                if x+w>W:
                     x=0
                     y+=linha_alt
                     linha_alt=0
 
-                if y+h>altura:
+                if y+h>H:
                     break
 
-                rect = plt.Rectangle(
+                rect=plt.Rectangle(
                     (x,y),
                     w,
                     h,
@@ -286,12 +327,11 @@ if menu == "Lote de Produção":
                 ax.add_patch(rect)
 
                 x+=w
-
                 linha_alt=max(linha_alt,h)
 
                 area_usada+=w*h
 
-            area_total=largura*altura
+            area_total=W*H
 
             aproveitamento=area_usada/area_total*100
 
