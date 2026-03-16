@@ -57,11 +57,13 @@ if menu == "Importar Portas Excel":
 
             for _, r in dados.iterrows():
 
+                vidro = str(r["vidro"]).capitalize()
+
                 laminas.append({
-                    "vidro": r["vidro"],
-                    "esp": r["espessura"],
-                    "larg": r["largura"],
-                    "alt": r["altura"]
+                    "vidro": vidro,
+                    "esp": int(r["espessura"]),
+                    "larg": float(r["largura"]),
+                    "alt": float(r["altura"])
                 })
 
             st.session_state.portas.append({
@@ -121,10 +123,8 @@ if menu == "Cadastro de Chapas":
         col1.write(f"{c['vidro']} {c['esp']}mm")
         col2.write(f"{c['largura']} x {c['altura']}")
 
-        if col3.button(
-            "Excluir",
-            key=f"exc_chapa{i}"
-        ):
+        if col3.button("Excluir",key=f"exc_chapa{i}"):
+
             st.session_state.chapas.pop(i)
             st.rerun()
 
@@ -212,10 +212,7 @@ if menu == "Portas Cadastradas":
 
         col1.write(f"Código {p.get('codigo','SEM CODIGO')}")
 
-        if col2.button(
-            "Adicionar ao lote",
-            key=f"add{i}"
-        ):
+        if col2.button("Adicionar ao lote",key=f"add{i}"):
 
             st.session_state.lote.append({
                 "codigo":p.get("codigo","SEM CODIGO"),
@@ -223,15 +220,13 @@ if menu == "Portas Cadastradas":
                 "qtd":1
             })
 
-        if col3.button(
-            "Excluir",
-            key=f"exc{i}"
-        ):
+        if col3.button("Excluir",key=f"exc{i}"):
+
             st.session_state.portas.pop(i)
             st.rerun()
 
 # -------------------------
-# LOTE
+# LOTE PRODUÇÃO
 # -------------------------
 
 if menu == "Lote de Produção":
@@ -243,7 +238,7 @@ if menu == "Lote de Produção":
 
     for i,p in enumerate(st.session_state.lote):
 
-        col1,col2,col3,col4 = st.columns([3,1,1,1])
+        col1,col2,col3,col4 = st.columns([4,1,1,1])
 
         col1.write(f"Porta {p.get('codigo','SEM CODIGO')}")
 
@@ -295,6 +290,7 @@ if menu == "Lote de Produção":
                     chapa=c
 
             if chapa is None:
+
                 st.warning("Chapa não cadastrada")
                 continue
 
@@ -321,6 +317,7 @@ if menu == "Lote de Produção":
                     w,h=h,w
 
                 if x+w>W:
+
                     x=0
                     y+=linha_alt
                     linha_alt=0
@@ -349,10 +346,5 @@ if menu == "Lote de Produção":
 
             st.pyplot(fig)
 
-            st.write(
-                f"Aproveitamento: {aproveitamento:.1f}%"
-            )
-
-            st.write(
-                f"Sucata: {100-aproveitamento:.1f}%"
-            )
+            st.write(f"Aproveitamento: {aproveitamento:.1f}%")
+            st.write(f"Sucata: {100-aproveitamento:.1f}%")
