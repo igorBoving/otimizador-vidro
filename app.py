@@ -4,10 +4,6 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
 
-# -----------------------------
-# SESSION STATE
-# -----------------------------
-
 if "portas" not in st.session_state:
     st.session_state.portas = []
 
@@ -17,9 +13,6 @@ if "chapas" not in st.session_state:
 if "lote" not in st.session_state:
     st.session_state.lote = []
 
-# -----------------------------
-# MENU
-# -----------------------------
 
 menu = st.sidebar.selectbox(
     "Menu",
@@ -38,9 +31,9 @@ menu = st.sidebar.selectbox(
 
 if menu == "Importar Portas Excel":
 
-    st.title("Importar portas do Excel")
+    st.title("Importar portas")
 
-    arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
+    arquivo = st.file_uploader("Planilha Excel", type=["xlsx"])
 
     if arquivo:
 
@@ -66,7 +59,8 @@ if menu == "Importar Portas Excel":
                 "laminas": laminas
             })
 
-        st.success("Portas importadas")
+        st.success("Importação concluída")
+
 
 # -----------------------------
 # CADASTRO CHAPAS
@@ -74,7 +68,7 @@ if menu == "Importar Portas Excel":
 
 if menu == "Cadastro de Chapas":
 
-    st.title("Cadastro de Chapas")
+    st.title("Cadastro de chapas")
 
     col1,col2 = st.columns(2)
 
@@ -83,8 +77,8 @@ if menu == "Cadastro de Chapas":
 
     col3,col4 = st.columns(2)
 
-    largura = col3.number_input("Largura chapa",value=6000)
-    altura = col4.number_input("Altura chapa",value=3210)
+    largura = col3.number_input("Largura",value=6000)
+    altura = col4.number_input("Altura",value=3210)
 
     if st.button("Cadastrar chapa"):
 
@@ -104,10 +98,11 @@ if menu == "Cadastro de Chapas":
         col1.write(f"{c['vidro']} {c['esp']}mm")
         col2.write(f"{c['largura']} x {c['altura']}")
 
-        if col3.button("Excluir",key=f"exc{i}"):
+        if col3.button("Excluir",key=f"ex{i}"):
 
             st.session_state.chapas.pop(i)
             st.rerun()
+
 
 # -----------------------------
 # CADASTRO PORTAS
@@ -115,42 +110,43 @@ if menu == "Cadastro de Chapas":
 
 if menu == "Cadastro de Portas":
 
-    st.title("Cadastro de Porta")
+    st.title("Cadastro de porta")
 
     codigo = st.number_input("Código",step=1)
 
     tipo = st.selectbox("Tipo",["Simples","Dupla","Tripla"])
 
-    laminas = {"Simples":1,"Dupla":2,"Tripla":3}[tipo]
+    qtd = {"Simples":1,"Dupla":2,"Tripla":3}[tipo]
 
-    dados=[]
+    laminas=[]
 
-    for i in range(laminas):
+    for i in range(qtd):
 
         st.subheader(f"Lâmina {i+1}")
 
         col1,col2,col3,col4 = st.columns(4)
 
-        vidro = col1.selectbox("Vidro",["Incolor","Tek"],key=f"vidro{i}")
-        esp = col2.selectbox("Espessura",[4,6,8],key=f"esp{i}")
-        larg = col3.number_input("Largura",key=f"larg{i}")
-        alt = col4.number_input("Altura",key=f"alt{i}")
+        vidro = col1.selectbox("Vidro",["Incolor","Tek"],key=f"v{i}")
+        esp = col2.selectbox("Espessura",[4,6,8],key=f"e{i}")
+        larg = col3.number_input("Largura",key=f"l{i}")
+        alt = col4.number_input("Altura",key=f"a{i}")
 
-        dados.append({
+        laminas.append({
             "vidro":vidro,
             "esp":esp,
             "larg":larg,
             "alt":alt
         })
 
-    if st.button("Salvar porta"):
+    if st.button("Salvar"):
 
         st.session_state.portas.append({
             "codigo":codigo,
-            "laminas":dados
+            "laminas":laminas
         })
 
         st.success("Porta cadastrada")
+
 
 # -----------------------------
 # PORTAS CADASTRADAS
@@ -162,25 +158,26 @@ if menu == "Portas Cadastradas":
 
     for i,p in enumerate(st.session_state.portas):
 
-        col1,col2,col3 = st.columns([3,2,1])
+        col1,col2,col3 = st.columns([4,2,1])
 
-        col1.write(f"Código {p.get('codigo','SEM CODIGO')}")
+        col1.write(f"Porta {p['codigo']}")
 
         if col2.button("Adicionar ao lote",key=f"add{i}"):
 
             st.session_state.lote.append({
-                "codigo":p.get("codigo","SEM CODIGO"),
+                "codigo":p["codigo"],
                 "laminas":p["laminas"],
                 "qtd":1
             })
 
-        if col3.button("Excluir",key=f"exc{i}"):
+        if col3.button("Excluir",key=f"del{i}"):
 
             st.session_state.portas.pop(i)
             st.rerun()
 
+
 # -----------------------------
-# LOTE PRODUÇÃO
+# LOTE
 # -----------------------------
 
 if menu == "Lote de Produção":
@@ -191,7 +188,7 @@ if menu == "Lote de Produção":
 
         col1,col2,col3,col4 = st.columns([4,1,1,1])
 
-        col1.write(f"Porta {p.get('codigo','SEM CODIGO')}")
+        col1.write(f"Porta {p['codigo']}")
 
         if col2.button("-",key=f"menos{i}"):
 
@@ -204,6 +201,7 @@ if menu == "Lote de Produção":
 
             p["qtd"]+=1
 
+
     if st.button("Gerar Corte"):
 
         pecas=[]
@@ -213,11 +211,13 @@ if menu == "Lote de Produção":
             for _ in range(porta["qtd"]):
 
                 for l in porta["laminas"]:
+
                     pecas.append(l)
 
-        df=pd.DataFrame(pecas)
+        df = pd.DataFrame(pecas)
 
-        grupos=df.groupby(["vidro","esp"])
+        grupos = df.groupby(["vidro","esp"])
+
 
         for g,dados in grupos:
 
@@ -237,62 +237,68 @@ if menu == "Lote de Produção":
                 st.warning("Chapa não cadastrada")
                 continue
 
+
             W=chapa["largura"]
             H=chapa["altura"]
 
             dados["area"]=dados["larg"]*dados["alt"]
+
             dados=dados.sort_values(by="area",ascending=False)
 
             chapas=[]
-            livre=[(0,0,W,H)]
 
-            layout=[]
+            livres=[(0,0,W,H)]
+
+            atual=[]
 
             for _,r in dados.iterrows():
 
-                w=r["larg"]
-                h=r["alt"]
-
                 colocado=False
 
-                for i,(x,y,L,A) in enumerate(livre):
+                for i,(x,y,w,h) in enumerate(livres):
 
-                    for rot in [(w,h),(h,w)]:
+                    pw=r["larg"]
+                    ph=r["alt"]
 
-                        pw,ph=rot
+                    if pw<=w and ph<=h:
 
-                        if pw<=L and ph<=A:
+                        atual.append((x,y,pw,ph))
 
-                            layout.append((x,y,pw,ph))
+                        livres.pop(i)
 
-                            livre.pop(i)
+                        livres.append((x+pw,y,w-pw,ph))
+                        livres.append((x,y+ph,w,h-ph))
 
-                            livre.append((x+pw,y,L-pw,ph))
-                            livre.append((x,y+ph,L,A-ph))
+                        colocado=True
+                        break
 
-                            colocado=True
-                            break
+                    if ph<=w and pw<=h:
 
-                    if colocado:
+                        atual.append((x,y,ph,pw))
+
+                        livres.pop(i)
+
+                        livres.append((x+ph,y,w-ph,pw))
+                        livres.append((x,y+pw,w,h-pw))
+
+                        colocado=True
                         break
 
                 if not colocado:
 
-                    chapas.append(layout)
+                    chapas.append(atual)
 
-                    livre=[(0,0,W,H)]
-                    layout=[]
+                    livres=[(0,0,W,H)]
 
-                    layout.append((0,0,w,h))
+                    atual=[(0,0,r["larg"],r["alt"])]
 
-                    livre.append((w,0,W-w,h))
-                    livre.append((0,h,W,H-h))
+            if atual:
+                chapas.append(atual)
 
-            if layout:
-                chapas.append(layout)
 
             st.write("Peças:",len(dados))
             st.write("Chapas:",len(chapas))
+
 
             for i,ch in enumerate(chapas):
 
@@ -303,11 +309,10 @@ if menu == "Lote de Produção":
                 ax.set_xlim(0,W)
                 ax.set_ylim(0,H)
 
-                area=0
-
                 for x,y,w,h in ch:
 
                     rect=plt.Rectangle((x,y),w,h,fill=None)
+
                     ax.add_patch(rect)
 
                     ax.text(
@@ -319,10 +324,4 @@ if menu == "Lote de Produção":
                         fontsize=8
                     )
 
-                    area+=w*h
-
                 st.pyplot(fig)
-
-                aproveitamento=area/(W*H)*100
-
-                st.write(f"Aproveitamento {aproveitamento:.1f}%")
