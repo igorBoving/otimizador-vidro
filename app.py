@@ -40,10 +40,7 @@ if menu == "Importar Portas Excel":
 
     st.title("Importar portas do Excel")
 
-    arquivo = st.file_uploader(
-        "Selecione a planilha",
-        type=["xlsx"]
-    )
+    arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
 
     if arquivo:
 
@@ -83,35 +80,21 @@ if menu == "Cadastro de Chapas":
 
     col1,col2 = st.columns(2)
 
-    vidro = col1.selectbox(
-        "Tipo vidro",
-        ["Incolor","Tek"]
-    )
-
-    esp = col2.selectbox(
-        "Espessura",
-        [4,6,8]
-    )
+    vidro = col1.selectbox("Tipo vidro",["Incolor","Tek"])
+    esp = col2.selectbox("Espessura",[4,6,8])
 
     col3,col4 = st.columns(2)
 
-    largura = col3.number_input(
-        "Largura chapa",
-        value=6000
-    )
-
-    altura = col4.number_input(
-        "Altura chapa",
-        value=3210
-    )
+    largura = col3.number_input("Largura chapa",value=6000)
+    altura = col4.number_input("Altura chapa",value=3210)
 
     if st.button("Cadastrar chapa"):
 
         st.session_state.chapas.append({
-            "vidro": vidro,
-            "esp": esp,
-            "largura": largura,
-            "altura": altura
+            "vidro":vidro,
+            "esp":esp,
+            "largura":largura,
+            "altura":altura
         })
 
     st.subheader("Chapas cadastradas")
@@ -136,23 +119,13 @@ if menu == "Cadastro de Portas":
 
     st.title("Cadastro de Porta")
 
-    codigo = st.number_input(
-        "Código",
-        step=1
-    )
+    codigo = st.number_input("Código",step=1)
 
-    tipo = st.selectbox(
-        "Tipo",
-        ["Simples","Dupla","Tripla"]
-    )
+    tipo = st.selectbox("Tipo",["Simples","Dupla","Tripla"])
 
-    laminas = 1
-    if tipo == "Dupla":
-        laminas = 2
-    if tipo == "Tripla":
-        laminas = 3
+    laminas = {"Simples":1,"Dupla":2,"Tripla":3}[tipo]
 
-    dados = []
+    dados=[]
 
     for i in range(laminas):
 
@@ -160,27 +133,10 @@ if menu == "Cadastro de Portas":
 
         col1,col2,col3,col4 = st.columns(4)
 
-        vidro = col1.selectbox(
-            "Vidro",
-            ["Incolor","Tek"],
-            key=f"vidro{i}"
-        )
-
-        esp = col2.selectbox(
-            "Espessura",
-            [4,6,8],
-            key=f"esp{i}"
-        )
-
-        larg = col3.number_input(
-            "Largura",
-            key=f"larg{i}"
-        )
-
-        alt = col4.number_input(
-            "Altura",
-            key=f"alt{i}"
-        )
+        vidro = col1.selectbox("Vidro",["Incolor","Tek"],key=f"vidro{i}")
+        esp = col2.selectbox("Espessura",[4,6,8],key=f"esp{i}")
+        larg = col3.number_input("Largura",key=f"larg{i}")
+        alt = col4.number_input("Altura",key=f"alt{i}")
 
         dados.append({
             "vidro":vidro,
@@ -226,15 +182,12 @@ if menu == "Portas Cadastradas":
             st.rerun()
 
 # -------------------------
-# LOTE PRODUÇÃO
+# LOTE
 # -------------------------
 
 if menu == "Lote de Produção":
 
     st.title("Lote de produção")
-
-    if len(st.session_state.lote)==0:
-        st.info("Lote vazio")
 
     for i,p in enumerate(st.session_state.lote):
 
@@ -265,12 +218,7 @@ if menu == "Lote de Produção":
 
                 for l in porta["laminas"]:
 
-                    pecas.append({
-                        "vidro":l["vidro"],
-                        "esp":l["esp"],
-                        "larg":l["larg"],
-                        "alt":l["alt"]
-                    })
+                    pecas.append(l)
 
         df=pd.DataFrame(pecas)
 
@@ -280,7 +228,7 @@ if menu == "Lote de Produção":
 
             vidro,esp=g
 
-            st.subheader(f"{vidro} {esp}mm")
+            st.header(f"{vidro} {esp}mm")
 
             chapa=None
 
@@ -297,54 +245,80 @@ if menu == "Lote de Produção":
             W=chapa["largura"]
             H=chapa["altura"]
 
-            fig,ax=plt.subplots()
+            dados["area"]=dados["larg"]*dados["alt"]
+            dados=dados.sort_values(by="area",ascending=False)
 
-            ax.set_xlim(0,W)
-            ax.set_ylim(0,H)
+            chapas=[]
+            atual=[]
 
-            x=0
-            y=0
-            linha_alt=0
-
-            area_usada=0
+            x=y=linha=0
+            idpeca=1
 
             for _,r in dados.iterrows():
 
                 w=r["larg"]
                 h=r["alt"]
 
-                if w>h:
+                if w>W or h>H:
+
                     w,h=h,w
 
                 if x+w>W:
 
                     x=0
-                    y+=linha_alt
-                    linha_alt=0
+                    y+=linha
+                    linha=0
 
                 if y+h>H:
-                    break
 
-                rect=plt.Rectangle(
-                    (x,y),
-                    w,
-                    h,
-                    fill=None,
-                    edgecolor="blue"
-                )
+                    chapas.append(atual)
 
-                ax.add_patch(rect)
+                    atual=[]
+                    x=y=linha=0
+
+                atual.append((x,y,w,h,idpeca))
 
                 x+=w
-                linha_alt=max(linha_alt,h)
+                linha=max(linha,h)
 
-                area_usada+=w*h
+                idpeca+=1
 
-            area_total=W*H
+            if atual:
+                chapas.append(atual)
 
-            aproveitamento=area_usada/area_total*100
+            st.write("Peças totais:",len(dados))
+            st.write("Chapas necessárias:",len(chapas))
 
-            st.pyplot(fig)
+            for i,ch in enumerate(chapas):
 
-            st.write(f"Aproveitamento: {aproveitamento:.1f}%")
-            st.write(f"Sucata: {100-aproveitamento:.1f}%")
+                st.subheader(f"Chapa {i+1}")
+
+                fig,ax=plt.subplots()
+
+                ax.set_xlim(0,W)
+                ax.set_ylim(0,H)
+
+                area=0
+
+                for x,y,w,h,idp in ch:
+
+                    rect=plt.Rectangle((x,y),w,h,fill=None)
+                    ax.add_patch(rect)
+
+                    ax.text(
+                        x+w/2,
+                        y+h/2,
+                        f"#{idp}\n{int(w)}x{int(h)}",
+                        ha="center",
+                        va="center",
+                        fontsize=8
+                    )
+
+                    area+=w*h
+
+                st.pyplot(fig)
+
+                aproveitamento=area/(W*H)*100
+
+                st.write(f"Aproveitamento: {aproveitamento:.1f}%")
+                st.write(f"Sucata: {100-aproveitamento:.1f}%")
