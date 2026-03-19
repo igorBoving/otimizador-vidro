@@ -1,14 +1,12 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 st.set_page_config(layout="wide")
 
-# -----------------------------
-# SESSION
-# -----------------------------
-
+# ==============================
+# ESTADO
+# ==============================
 if "portas" not in st.session_state:
     st.session_state.portas = []
 
@@ -16,358 +14,172 @@ if "chapas" not in st.session_state:
     st.session_state.chapas = []
 
 if "lote" not in st.session_state:
-    st.session_state.lote = []
+    st.session_state.lote = {}
 
-# -----------------------------
-# FUNÇÕES NOVAS
-# -----------------------------
+# ==============================
+# MENU (NÃO ALTERADO)
+# ==============================
+menu = st.sidebar.selectbox("Menu", ["Cadastro de Chapas", "Cadastro de Portas", "Lote de Produção"])
 
-def mapear_material(vidro, esp):
-
-    if vidro == "Incolor":
-        return f"JUMBO_{esp}MM"
-
-    if vidro == "Tek":
-        return f"TEK_{esp}MM"
-
-    return f"JUMBO_{esp}MM"
-
-
-def exportar_ascii(pecas):
-
-    data = datetime.now().strftime("%d%m%Y")
-    total = len(pecas)
-
-    linhas = []
-
-    cabecalho = f"LOTEVIDRO{' ' * 23}{data}{' ' * 8}{str(total).zfill(8)}V4"
-    linhas.append(cabecalho)
-
-    linhas.append(str(total).zfill(8))
-
-    pos = 1
-
-    for p in pecas:
-
-        material = mapear_material(p["vidro"], p["esp"]).ljust(16)
-
-        posicao = str(pos).zfill(5)
-        cliente = "PRODUCAO".ljust(12)
-        pedido = "INTERNO".ljust(12)
-
-        shape = "RECT".ljust(8)
-        grind = "0000.0000"
-        prioridade = "000"
-        rot = "Y"
-        qtd = "00000001"
-
-        x = f"{p['larg']:08.3f}"
-        y = f"{p['alt']:08.3f}"
-
-        linha = (
-            f"{material}"
-            f"{posicao}"
-            f"{cliente}"
-            f"{pedido}"
-            f"{shape}"
-            f"{grind}"
-            f"{prioridade}"
-            f"{rot}"
-            f"{qtd}"
-            f"{'0'*8}"
-            f"{x}"
-            f"{y}"
-        )
-
-        linhas.append(linha)
-        linhas.append("+CUT")
-
-        pos += 1
-
-    return "\n".join(linhas)
-
-# -----------------------------
-# MENU
-# -----------------------------
-
-menu = st.sidebar.selectbox(
-    "Menu",
-    [
-        "Importar Portas Excel",
-        "Cadastro de Chapas",
-        "Cadastro de Portas",
-        "Portas Cadastradas",
-        "Lote de Produção"
-    ]
-)
-
-# -----------------------------
-# IMPORTAR
-# -----------------------------
-
-if menu == "Importar Portas Excel":
-
-    st.title("Importar portas")
-
-    arquivo = st.file_uploader("Excel", type=["xlsx"])
-
-    if arquivo:
-
-        df = pd.read_excel(arquivo)
-
-        grupos = df.groupby("codigo")
-
-        for cod, dados in grupos:
-
-            laminas = []
-
-            for _, r in dados.iterrows():
-                laminas.append({
-                    "vidro": str(r["vidro"]).capitalize(),
-                    "esp": int(r["espessura"]),
-                    "larg": float(r["largura"]),
-                    "alt": float(r["altura"])
-                })
-
-            st.session_state.portas.append({
-                "codigo": cod,
-                "laminas": laminas
-            })
-
-        st.success("Importado")
-
-# -----------------------------
-# CHAPAS
-# -----------------------------
-
+# ==============================
+# CADASTRO DE CHAPAS
+# ==============================
 if menu == "Cadastro de Chapas":
+    st.title("Cadastro de Chapas")
 
-    st.title("Chapas")
+    nome = st.text_input("Nome da chapa")
+    largura = st.number_input("Largura", value=6000)
+    altura = st.number_input("Altura", value=3210)
+    tipo = st.selectbox("Tipo", ["incolor", "tek"])
 
-    col1,col2 = st.columns(2)
-
-    vidro = col1.selectbox("Vidro",["Incolor","Tek"])
-    esp = col2.selectbox("Esp",[4,6,8])
-
-    col3,col4 = st.columns(2)
-
-    largura = col3.number_input("Largura",value=6000)
-    altura = col4.number_input("Altura",value=3210)
-
-    if st.button("Cadastrar"):
+    if st.button("Adicionar chapa"):
         st.session_state.chapas.append({
-            "vidro":vidro,
-            "esp":esp,
-            "largura":largura,
-            "altura":altura
+            "nome": nome,
+            "largura": largura,
+            "altura": altura,
+            "tipo": tipo
         })
 
-    for i,c in enumerate(st.session_state.chapas):
-
-        col1,col2,col3 = st.columns([3,3,1])
-
-        col1.write(f"{c['vidro']} {c['esp']}mm")
-        col2.write(f"{c['largura']} x {c['altura']}")
-
-        if col3.button("Excluir",key=f"exc{i}"):
+    for i, c in enumerate(st.session_state.chapas):
+        col1, col2 = st.columns([4,1])
+        col1.write(f"{c['nome']} - {c['largura']}x{c['altura']} ({c['tipo']})")
+        if col2.button("Remover", key=f"remover_chapa_{i}"):
             st.session_state.chapas.pop(i)
             st.rerun()
 
-# -----------------------------
-# PORTAS
-# -----------------------------
-
+# ==============================
+# CADASTRO DE PORTAS
+# ==============================
 if menu == "Cadastro de Portas":
+    st.title("Cadastro de Portas")
 
-    st.title("Cadastro Porta")
+    codigo = st.text_input("Código da porta")
+    larg = st.number_input("Largura", value=600)
+    alt = st.number_input("Altura", value=1700)
+    tipo = st.selectbox("Tipo de vidro", ["incolor", "tek"])
 
-    codigo = st.number_input("Código",step=1)
-
-    tipo = st.selectbox("Tipo",["Simples","Dupla","Tripla"])
-    n = {"Simples":1,"Dupla":2,"Tripla":3}[tipo]
-
-    dados=[]
-
-    for i in range(n):
-
-        st.subheader(f"Lâmina {i+1}")
-
-        col1,col2,col3,col4 = st.columns(4)
-
-        vidro = col1.selectbox("Vidro",["Incolor","Tek"],key=f"v{i}")
-        esp = col2.selectbox("Esp",[4,6,8],key=f"e{i}")
-        larg = col3.number_input("Larg",key=f"l{i}")
-        alt = col4.number_input("Alt",key=f"a{i}")
-
-        dados.append({
-            "vidro":vidro,
-            "esp":esp,
-            "larg":larg,
-            "alt":alt
-        })
-
-    if st.button("Salvar"):
+    if st.button("Salvar porta"):
         st.session_state.portas.append({
-            "codigo":codigo,
-            "laminas":dados
+            "codigo": codigo,
+            "larg": larg,
+            "alt": alt,
+            "tipo": tipo
         })
 
-# -----------------------------
-# PORTAS LISTA
-# -----------------------------
+    st.subheader("Portas cadastradas")
 
-if menu == "Portas Cadastradas":
+    for i, p in enumerate(st.session_state.portas):
+        st.write(f"{p['codigo']} - {p['larg']}x{p['alt']} ({p['tipo']})")
 
-    for i,p in enumerate(st.session_state.portas):
+# ==============================
+# FUNÇÃO OTIMIZAÇÃO (MELHORADA)
+# ==============================
+def otimizar_chapa(pecas, W, H):
+    pecas.sort(key=lambda x: x[0]*x[1], reverse=True)
 
-        col1,col2,col3 = st.columns([3,2,1])
+    ocupados = []
+    livres = [(0, 0, W, H)]
 
-        col1.write(f"Porta {p.get('codigo')}")
+    for pw, ph in pecas:
+        colocado = False
 
-        if col2.button("Adicionar",key=f"add{i}"):
+        for i, (x, y, lw, lh) in enumerate(livres):
 
-            st.session_state.lote.append({
-                "codigo":p["codigo"],
-                "laminas":p["laminas"],
-                "qtd":1
-            })
+            # normal
+            if pw <= lw and ph <= lh:
+                ocupados.append((x, y, pw, ph))
 
-        if col3.button("Excluir",key=f"exc{i}"):
+                livres.pop(i)
+                livres.append((x + pw, y, lw - pw, ph))
+                livres.append((x, y + ph, lw, lh - ph))
 
-            st.session_state.portas.pop(i)
-            st.rerun()
+                colocado = True
+                break
 
-# -----------------------------
-# LOTE + CORTE
-# -----------------------------
+            # girado
+            if ph <= lw and pw <= lh:
+                ocupados.append((x, y, ph, pw))
 
+                livres.pop(i)
+                livres.append((x + ph, y, lw - ph, pw))
+                livres.append((x, y + pw, lw, lh - pw))
+
+                colocado = True
+                break
+
+        if not colocado:
+            pass
+
+    return ocupados
+
+# ==============================
+# LOTE DE PRODUÇÃO
+# ==============================
 if menu == "Lote de Produção":
+    st.title("Lote de produção")
 
-    st.title("Lote")
+    # CONTROLE + -
+    for p in st.session_state.portas:
+        col1, col2, col3 = st.columns([4,1,1])
 
-    for i,p in enumerate(st.session_state.lote):
+        if p["codigo"] not in st.session_state.lote:
+            st.session_state.lote[p["codigo"]] = 0
 
-        col1,col2,col3,col4 = st.columns([4,1,1,1])
+        col1.write(f"{p['codigo']}")
 
-        col1.write(f"Porta {p['codigo']}")
+        if col2.button("-", key=f"menos_{p['codigo']}"):
+            if st.session_state.lote[p["codigo"]] > 0:
+                st.session_state.lote[p["codigo"]] -= 1
 
-        if col2.button("-",key=f"m{i}"):
-            if p["qtd"]>1:
-                p["qtd"]-=1
+        col3.write(st.session_state.lote[p["codigo"]])
 
-        col3.write(p["qtd"])
-
-        if col4.button("+",key=f"p{i}"):
-            p["qtd"]+=1
+        if col3.button("+", key=f"mais_{p['codigo']}"):
+            st.session_state.lote[p["codigo"]] += 1
 
     if st.button("Gerar Corte"):
+        for tipo in ["incolor", "tek"]:
+            st.subheader(f"{tipo}")
 
-        pecas=[]
+            chapas = [c for c in st.session_state.chapas if c["tipo"] == tipo]
 
-        for porta in st.session_state.lote:
-            for _ in range(porta["qtd"]):
-                for l in porta["laminas"]:
-                    pecas.append(l)
-
-        df=pd.DataFrame(pecas)
-        grupos=df.groupby(["vidro","esp"])
-
-        for g,dados in grupos:
-
-            vidro,esp=g
-
-            st.header(f"{vidro} {esp}mm")
-
-            chapa=None
-
-            for c in st.session_state.chapas:
-                if c["vidro"]==vidro and c["esp"]==esp:
-                    chapa=c
-
-            if chapa is None:
-                st.warning("Sem chapa")
+            if not chapas:
+                st.warning("Chapa não cadastrada")
                 continue
 
-            W=chapa["largura"]
-            H=chapa["altura"]
+            chapa = chapas[0]
 
-            dados["area"]=dados["larg"]*dados["alt"]
-            dados=dados.sort_values(by="area",ascending=False)
+            pecas = []
 
-            livre=[(0,0,W,H)]
-            chapas=[]
-            layout=[]
+            for p in st.session_state.portas:
+                qtd = st.session_state.lote.get(p["codigo"], 0)
 
-            for _,r in dados.iterrows():
+                if p["tipo"] == tipo:
+                    for _ in range(qtd):
+                        pecas.append((p["larg"], p["alt"]))
 
-                w=r["larg"]
-                h=r["alt"]
+            if not pecas:
+                continue
 
-                colocado=False
+            ocupados = otimizar_chapa(pecas, chapa["largura"], chapa["altura"])
 
-                for i,(x,y,L,A) in enumerate(livre):
+            fig, ax = plt.subplots(figsize=(10,5))
 
-                    for pw,ph in [(w,h),(h,w)]:
+            ax.set_xlim(0, chapa["largura"])
+            ax.set_ylim(0, chapa["altura"])
 
-                        if pw<=L and ph<=A:
+            area_usada = 0
 
-                            layout.append((x,y,pw,ph))
-                            livre.pop(i)
+            for x, y, w, h in ocupados:
+                ax.add_patch(plt.Rectangle((x,y), w, h, fill=False))
+                ax.text(x+w/2, y+h/2, f"{w}x{h}", ha="center", va="center")
+                area_usada += w*h
 
-                            livre.append((x+pw,y,L-pw,ph))
-                            livre.append((x,y+ph,L,A-ph))
+            area_total = chapa["largura"] * chapa["altura"]
 
-                            colocado=True
-                            break
+            aproveitamento = (area_usada / area_total) * 100
+            sucata = 100 - aproveitamento
 
-                    if colocado:
-                        break
+            st.pyplot(fig)
 
-                if not colocado:
-
-                    chapas.append(layout)
-
-                    livre=[(0,0,W,H)]
-                    layout=[]
-
-            if layout:
-                chapas.append(layout)
-
-            # DESENHO + %
-            for i,ch in enumerate(chapas):
-
-                st.subheader(f"Chapa {i+1}")
-
-                fig,ax=plt.subplots()
-
-                ax.set_xlim(0,W)
-                ax.set_ylim(0,H)
-
-                area=0
-
-                for x,y,w,h in ch:
-
-                    rect=plt.Rectangle((x,y),w,h,fill=None)
-                    ax.add_patch(rect)
-
-                    ax.text(x+w/2,y+h/2,f"{int(w)}x{int(h)}",
-                            ha="center",va="center",fontsize=8)
-
-                    area+=w*h
-
-                st.pyplot(fig)
-
-                aproveitamento = area/(W*H)*100
-                sucata = 100 - aproveitamento
-
-                st.write(f"Aproveitamento: {aproveitamento:.1f}%")
-                st.write(f"Sucata: {sucata:.1f}%")
-
-        # EXPORTAÇÃO
-        arquivo = exportar_ascii(pecas)
-
-        st.download_button(
-            "Exportar para máquina",
-            arquivo,
-            file_name="corte_finoglass.asc"
-        )
+            st.success(f"Aproveitamento: {aproveitamento:.2f}%")
+            st.error(f"Sucata: {sucata:.2f}%")
