@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(layout="wide")
 
 # =========================
-# ESTADO
+# SESSION STATE
 # =========================
 if "portas" not in st.session_state:
     st.session_state.portas = []
@@ -17,53 +17,48 @@ if "quantidades" not in st.session_state:
     st.session_state.quantidades = {}
 
 # =========================
-# MENU
+# MENU (MANTIDO SIMPLES)
 # =========================
 menu = st.sidebar.selectbox("Menu", ["Lote de Produção"])
 
 # =========================
-# FUNÇÃO TETRIS
+# OTIMIZAÇÃO TETRIS MELHORADA
 # =========================
 def otimizar_chapa(pecas, W, H):
+
     pecas = sorted(pecas, key=lambda x: x[0]*x[1], reverse=True)
 
     livres = [(0, 0, W, H)]
     ocupados = []
 
-    for peca in pecas:
-        w, h = peca
-        melhor_idx = -1
-        melhor_area = None
-        melhor_rot = False
+    for w, h in pecas:
+        melhor = None
 
         for i, (x, y, lw, lh) in enumerate(livres):
+
             # normal
             if w <= lw and h <= lh:
-                sobra = lw*lh - w*h
-                if melhor_area is None or sobra < melhor_area:
-                    melhor_idx = i
-                    melhor_area = sobra
-                    melhor_rot = False
+                sobra = (lw*lh) - (w*h)
+                if melhor is None or sobra < melhor[0]:
+                    melhor = (sobra, i, x, y, w, h)
 
             # rotacionado
             if h <= lw and w <= lh:
-                sobra = lw*lh - h*w
-                if melhor_area is None or sobra < melhor_area:
-                    melhor_idx = i
-                    melhor_area = sobra
-                    melhor_rot = True
+                sobra = (lw*lh) - (h*w)
+                if melhor is None or sobra < melhor[0]:
+                    melhor = (sobra, i, x, y, h, w)
 
-        if melhor_idx == -1:
+        if melhor is None:
             continue
 
-        x, y, lw, lh = livres.pop(melhor_idx)
+        _, idx, x, y, w, h = melhor
 
-        if melhor_rot:
-            w, h = h, w
+        lw, lh = livres[idx][2], livres[idx][3]
+        livres.pop(idx)
 
         ocupados.append((x, y, w, h))
 
-        # novos espaços
+        # dividir espaço
         direita = (x + w, y, lw - w, h)
         baixo = (x, y + h, lw, lh - h)
 
@@ -76,22 +71,27 @@ def otimizar_chapa(pecas, W, H):
     return ocupados
 
 # =========================
-# DESENHAR CHAPA
+# DESENHO
 # =========================
-def desenhar_layout(pecas, W, H, titulo):
+def desenhar(pecas, W, H, titulo):
+
     fig, ax = plt.subplots()
 
     ax.set_xlim(0, W)
     ax.set_ylim(0, H)
 
-    area_total = W * H
     area_usada = 0
 
-    for i, (x, y, w, h) in enumerate(pecas):
+    for x, y, w, h in pecas:
         rect = plt.Rectangle((x, y), w, h, fill=False)
         ax.add_patch(rect)
-        ax.text(x + w/2, y + h/2, f"{w}x{h}", ha='center')
+
+        ax.text(x + w/2, y + h/2, f"{int(w)}x{int(h)}",
+                ha="center", va="center", fontsize=8)
+
         area_usada += w * h
+
+    area_total = W * H
 
     aproveitamento = (area_usada / area_total) * 100
     sucata = 100 - aproveitamento
@@ -110,7 +110,7 @@ if menu == "Lote de Produção":
     # =====================
     # IMPORTAR PORTAS
     # =====================
-    arquivo = st.file_uploader("Importar portas (Excel)", type=["xlsx"])
+    arquivo = st.file_uploader("Importar portas", type=["xlsx"], key="upload_portas")
 
     if arquivo:
         df = pd.read_excel(arquivo)
@@ -120,30 +120,33 @@ if menu == "Lote de Produção":
             st.session_state.quantidades[i] = 1
 
     # =====================
-    # LISTA DE PORTAS
+    # LISTA
     # =====================
     for i, p in enumerate(st.session_state.portas):
-        col1, col2, col3 = st.columns([3,1,1])
+
+        col1, col2, col3 = st.columns([4,1,1])
 
         with col1:
             st.write(f"Porta {p.get('codigo', i)}")
 
         with col2:
             if st.button("-", key=f"menos_{i}"):
-                st.session_state.quantidades[i] = max(0, st.session_state.quantidades[i] - 1)
+                st.session_state.quantidades[i] = max(
+                    0, st.session_state.quantidades.get(i, 0) - 1
+                )
 
         with col3:
             if st.button("+", key=f"mais_{i}"):
-                st.session_state.quantidades[i] += 1
+                st.session_state.quantidades[i] = st.session_state.quantidades.get(i, 0) + 1
 
-        st.write(f"Qtd: {st.session_state.quantidades[i]}")
+        st.write(f"Qtd: {st.session_state.quantidades.get(i,0)}")
 
     # =====================
     # IMPORTAR CHAPAS
     # =====================
-    st.subheader("Cadastrar chapas")
+    st.subheader("Importar chapas")
 
-    arquivo_chapas = st.file_uploader("Importar chapas", type=["xlsx"], key="chapas")
+    arquivo_chapas = st.file_uploader("Importar chapas", type=["xlsx"], key="upload_chapas")
 
     if arquivo_chapas:
         df_chapas = pd.read_excel(arquivo_chapas)
@@ -156,34 +159,33 @@ if menu == "Lote de Produção":
 
         pecas_por_tipo = {}
 
-        # organiza peças
         for i, p in enumerate(st.session_state.portas):
+
             qtd = st.session_state.quantidades.get(i, 0)
 
             for _ in range(qtd):
 
-                tipo = p.get("tipo", "incolor")
-                largura = int(p.get("largura"))
-                altura = int(p.get("altura"))
+                tipo = str(p.get("tipo", "incolor")).lower()
+                larg = int(p.get("largura"))
+                alt = int(p.get("altura"))
 
                 if tipo not in pecas_por_tipo:
                     pecas_por_tipo[tipo] = []
 
-                pecas_por_tipo[tipo].append((largura, altura))
+                pecas_por_tipo[tipo].append((larg, alt))
 
-        # gera para cada tipo
         for tipo, pecas in pecas_por_tipo.items():
 
-            st.subheader(f"{tipo}")
+            st.subheader(f"Vidro: {tipo}")
 
             chapa = None
 
             for c in st.session_state.chapas:
-                if c.get("tipo") == tipo:
+                if str(c.get("tipo")).lower() == tipo:
                     chapa = c
 
             if not chapa:
-                st.warning("Chapa não cadastrada")
+                st.warning(f"Sem chapa para {tipo}")
                 continue
 
             W = int(chapa["largura"])
@@ -191,4 +193,4 @@ if menu == "Lote de Produção":
 
             layout = otimizar_chapa(pecas, W, H)
 
-            desenhar_layout(layout, W, H, f"{tipo}")
+            desenhar(layout, W, H, f"{tipo}")
